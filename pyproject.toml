@@ -5,7 +5,6 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "elastic-pipes"
 description = "A lightweight composition system"
-version = "0.0"
 license = {text = "Apache-2.0"}
 authors = [
   {name = "Domenico Andreoli", email = "domenico.andreoli@elastic.co"},
@@ -22,10 +21,14 @@ dependencies = [
   "requests",
   "typer",
 ]
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/elastic/pipes-py"
 "Bug Tracker" = "https://github.com/elastic/pipes-py/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "core.__version__"}
 
 [project.scripts]
 elastic-pipes = "elastic.pipes.runner:main"

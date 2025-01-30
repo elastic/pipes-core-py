@@ -21,6 +21,8 @@ import sys
 from .errors import ConfigError, Error
 from .util import deserialize_yaml, get_field, serialize_yaml
 
+__version__ = "0.1.0"
+
 
 class __no_default__:
     pass
