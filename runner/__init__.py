@@ -95,9 +95,11 @@ def new(
 
 from elastic.pipes.core import Pipe
 
+
 @Pipe("{pipe_file.stem}", default={{}})
 def main(pipe, dry_run=False):
     pipe.logger.info("Hello, world!")
+
 
 if __name__ == "__main__":
     main()
