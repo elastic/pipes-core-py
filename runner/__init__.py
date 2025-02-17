@@ -72,7 +72,12 @@ def run(
     if base_dir not in sys.path:
         sys.path.append(base_dir)
 
-    state.setdefault("runtime", {})["base-dir"] = base_dir
+    state.setdefault("runtime", {}).update(
+        {
+            "base-dir": base_dir,
+            "in-memory-state": True,
+        }
+    )
 
     try:
         Pipe.run(state, dry_run=dry_run)
