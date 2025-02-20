@@ -20,7 +20,7 @@ import sys
 from .errors import ConfigError
 from .util import __no_default__, get_field
 
-__version__ = "0.2.0"
+__version__ = "0.3.0-dev"
 
 
 def validate_logging_config(name, config):
