@@ -17,18 +17,22 @@
 import sys
 from pathlib import Path
 
+from typing_extensions import Annotated
+
 from . import Pipe
-from .util import deserialize, fatal, get_field, set_field, warn_interactive
+from .util import deserialize, fatal, set_field, warn_interactive
 
 
 @Pipe("elastic.pipes.core.import")
-def main(pipe, dry_run=False):
-    base_dir = Path(get_field(pipe.state, "runtime.base-dir", Path.cwd()))
-    file_name = pipe.config("file", None)
-    field = pipe.config("field", None)
-    interactive = pipe.config("interactive", False)
-    format = pipe.config("format", None)
-
+def main(
+    pipe: Pipe,
+    dry_run: bool = False,
+    base_dir: Annotated[Path, Pipe.State("runtime.base-dir")] = Path.cwd(),
+    file_name: Annotated[str, Pipe.Config("file")] = None,
+    field: Annotated[str, Pipe.Config("field")] = None,
+    format: Annotated[str, Pipe.Config("format")] = None,
+    interactive: Annotated[bool, Pipe.Config("interactive")] = False,
+):
     if format is None:
         if file_name:
             format = Path(file_name).suffix.lower()[1:]

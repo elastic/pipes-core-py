@@ -17,8 +17,10 @@
 import logging
 import sys
 
+from typing_extensions import Annotated, NoDefault, get_args
+
 from .errors import ConfigError
-from .util import __no_default__, get_field
+from .util import get_field, set_field
 
 __version__ = "0.3.0-dev"
 
@@ -49,21 +51,6 @@ def get_pipes(state):
     return configs
 
 
-def _sync_logger_config(pipe):
-    elastic_pipes_logger = logging.getLogger("elastic.pipes")
-    if pipe.logger == elastic_pipes_logger:
-        return
-    for handler in reversed(pipe.logger.handlers):
-        pipe.logger.removeHandler(handler)
-    for handler in elastic_pipes_logger.handlers:
-        pipe.logger.addHandler(handler)
-    level = pipe.config("logging.level", None)
-    if level is None or getattr(elastic_pipes_logger, "overridden", False):
-        pipe.logger.setLevel(elastic_pipes_logger.level)
-    else:
-        pipe.logger.setLevel(level.upper())
-
-
 class Pipe:
     __pipes__ = {}
 
@@ -88,47 +75,41 @@ class Pipe:
         self.func = func
         return partial(run, self)
 
-    @classmethod
-    def run(cls, state, *, dry_run=False):
-        from importlib import import_module
+    def run(self, config, state, dry_run, logger):
         from inspect import signature
 
-        if not state:
-            raise ConfigError("invalid configuration, it's empty")
-
-        logger = logging.getLogger("elastic.pipes.core")
-
-        pipes = get_pipes(state)
-
-        for name, config in pipes:
-            if name in cls.__pipes__:
+        kwargs = {}
+        for name, param in signature(self.func).parameters.items():
+            if name == dry_run:
+                kwargs["dry_run"] = dry_run
                 continue
-            logger.debug(f"loading pipe '{name}'...")
-            import_module(name)
-            if name not in cls.__pipes__:
-                raise ConfigError(f"module does not define a pipe: {name}")
+            args = get_args(param.annotation)
+            for ann in args:
+                if isinstance(ann, self.Node):
+                    ann_name = ann.__class__.__name__.lower()
+                    root = locals()[ann_name]
+                    try:
+                        logger.debug(f"  pass {ann_name} node '{ann.node}' as variable '{name}'")
+                        kwargs[name] = args[0](get_field(root, ann.node))
+                    except KeyError:
+                        if param.default is param.empty:
+                            raise KeyError(f"{ann_name} node not found: '{ann.node}'")
+                        logger.debug(f"    using default value '{param.default}'")
+                        kwargs[name] = param.default
+                        if getattr(ann, "setdefault", False):
+                            logger.debug(f"    setting {ann_name} node '{ann.node}' to the default value")
+                            set_field(root, ann.node, param.default)
 
-        for name, config in pipes:
-            pipe = cls.__pipes__[name]
-            pipe.__config__ = config
-            pipe.state = state
-            _sync_logger_config(pipe)
-            sig = signature(pipe.func)
-            if "dry_run" in sig.parameters:
-                if dry_run:
-                    logger.debug(f"dry executing pipe '{name}'...")
-                else:
-                    logger.debug(f"executing pipe '{name}'...")
-                pipe.func(pipe, dry_run=dry_run)
-            elif dry_run:
-                logger.debug(f"not executing pipe '{name}'...")
-            else:
-                logger.debug(f"executing pipe '{name}'...")
-                pipe.func(pipe)
-            del pipe.state
-            del pipe.__config__
+        if not dry_run or "dry_run" in kwargs:
+            try:
+                self.__config__ = config
+                self.state = state
+                return self.func(self, **kwargs)
+            finally:
+                del self.__config__
+                del self.state
 
-    def config(self, flag, default=__no_default__):
+    def config(self, flag, default=NoDefault):
         return get_field(self.__config__, flag, default)
 
     def get_es(self):
@@ -165,11 +146,26 @@ class Pipe:
             args["basic_auth"] = (username, password)
         return Kibana(**args)
 
+    class Node:
+        def __init__(self, node):
+            self.node = node
+
+    class Config(Node):
+        pass
+
+    class State(Node):
+        def __init__(self, node, *, setdefault=False):
+            super().__init__(node)
+            self.setdefault = setdefault
+
 
 @Pipe("elastic.pipes")
-def elastic_pipes(pipe, dry_run=False):
-    min_version = pipe.config("minimum-version", None)
-    level = pipe.config("logging.level", None)
+def elastic_pipes(
+    pipe: Pipe,
+    dry_run: bool = False,
+    level: Annotated[str, Pipe.Config("logging.level")] = None,
+    min_version: Annotated[str, Pipe.Config("minimum-version")] = None,
+):
     if level is not None and not getattr(pipe.logger, "overridden", False):
         pipe.logger.setLevel(level.upper())
     if min_version is not None:

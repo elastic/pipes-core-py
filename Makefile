@@ -7,6 +7,10 @@ else
 	PYTHON ?= python3
 endif
 
+ifeq ($(USERNAME),)
+	USERNAME := $(USER)
+endif
+
 all: lint
 
 prereq:
@@ -27,6 +31,7 @@ test-ci:
 	elastic-pipes version
 	elastic-pipes new-pipe -f test/test-pipe.py
 	echo "test-result: ok" | $(PYTHON) test/test-pipe.py | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
+	echo "name: $(USERNAME)" | $(PYTHON) test/test-pipe.py | [ "`$(TEE_STDERR)`" = "name: $(USERNAME)" ]
 	echo "test-result: ok" | elastic-pipes run --log-level=debug test/test.yaml | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
 	cat test/test.yaml | elastic-pipes run --log-level=debug - | [ "`$(TEE_STDERR)`" = "{}" ]
 	@$(foreach SRC,$(FORMATS), \

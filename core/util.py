@@ -17,12 +17,9 @@
 import os
 import sys
 
+from typing_extensions import NoDefault
+
 from .errors import ConfigError, Error
-
-
-class __no_default__:
-    pass
-
 
 if sys.version_info >= (3, 12):
     from itertools import batched
@@ -35,7 +32,7 @@ else:
             yield chunk
 
 
-def get_field(dict, path, default=__no_default__, *, shell_expand=False):
+def get_field(dict, path, default=NoDefault, *, shell_expand=False):
     if path in (None, "", "."):
         return dict
     keys = path.split(".")
@@ -44,12 +41,12 @@ def get_field(dict, path, default=__no_default__, *, shell_expand=False):
     try:
         for key in keys:
             if dict is None:
-                if default == __no_default__:
+                if default == NoDefault:
                     raise KeyError(path)
                 return default
             dict = dict[key]
     except KeyError:
-        if default == __no_default__:
+        if default == NoDefault:
             raise KeyError(path)
         return default
 
