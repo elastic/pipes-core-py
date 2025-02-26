@@ -68,19 +68,15 @@ def run(pipe):
             fatal("This is an Elastic Pipes component, use the `-i` option to execute it interactively.")
 
         try:
-            pipe.state = receive_state_from_unix_pipe(pipe.logger, pipe.default)
-            pipes = get_pipes(pipe.state)
+            state = receive_state_from_unix_pipe(pipe.logger, pipe.default)
+            pipes = get_pipes(state)
         except Error as e:
             fatal(e)
 
-        pipe.__config__ = {}
-        for name, config in pipes:
-            if pipe.name == name:
-                pipe.__config__ = config
-                break
-
-        ret = pipe.func(pipe, dry_run)
-        send_state_to_unix_pipe(pipe.logger, pipe.state)
+        configs = [c for n, c in pipes if n == pipe.name]
+        config = configs[0] if configs else {}
+        ret = pipe.run(config, state, dry_run)
+        send_state_to_unix_pipe(pipe.logger, state)
         return ret
 
     typer.run(_main)

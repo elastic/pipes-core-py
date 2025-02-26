@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import sys
 from pathlib import Path
 
 import typer
 from typing_extensions import Annotated
 
-from ..core.util import fatal, warn_interactive
+from ..core.util import fatal, get_field, warn_interactive
 
 main = typer.Typer(pretty_exceptions_enable=False)
 
@@ -45,6 +46,21 @@ def setup_logging(log_level):
         logger.overridden = True
 
 
+def sync_logger_config(logger, config):
+    elastic_pipes_logger = logging.getLogger("elastic.pipes")
+    if logger == elastic_pipes_logger:
+        return
+    for handler in reversed(logger.handlers):
+        logger.removeHandler(handler)
+    for handler in elastic_pipes_logger.handlers:
+        logger.addHandler(handler)
+    level = get_field(config, "logging.level", None)
+    if level is None or getattr(elastic_pipes_logger, "overridden", False):
+        logger.setLevel(elastic_pipes_logger.level)
+    else:
+        logger.setLevel(level.upper())
+
+
 @main.command()
 def run(
     config_file: typer.FileText,
@@ -54,7 +70,10 @@ def run(
     """
     Run pipes
     """
-    from ..core import Pipe
+    from importlib import import_module
+    from inspect import signature
+
+    from ..core import Pipe, get_pipes
     from ..core.errors import Error
     from ..core.util import deserialize_yaml
 
@@ -63,6 +82,9 @@ def run(
         state = deserialize_yaml(config_file) or {}
     except FileNotFoundError as e:
         fatal(f"{e.strerror}: '{e.filename}'")
+
+    if not state:
+        fatal("invalid configuration, it's empty")
 
     if config_file.name == "<stdin>":
         base_dir = Path.cwd()
@@ -79,11 +101,32 @@ def run(
         }
     )
 
-    try:
-        Pipe.run(state, dry_run=dry_run)
-    except Error as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
+    logger = logging.getLogger("elastic.pipes.core")
+
+    pipes = get_pipes(state)
+
+    for name, config in pipes:
+        if name in Pipe.__pipes__:
+            continue
+        logger.debug(f"loading pipe '{name}'...")
+        import_module(name)
+        if name not in Pipe.__pipes__:
+            fatal(f"module does not define a pipe: {name}")
+
+    for name, config in pipes:
+        pipe = Pipe.__pipes__[name]
+        sync_logger_config(pipe.logger, config)
+        if not dry_run:
+            logger.debug(f"executing pipe '{name}'...")
+        elif "dry_run" in signature(pipe.func).parameters:
+            logger.debug(f"dry executing pipe '{name}'...")
+        else:
+            logger.debug(f"not executing pipe '{name}'...")
+
+        try:
+            pipe.run(config, state, dry_run)
+        except Error as e:
+            fatal(e)
 
 
 @main.command()

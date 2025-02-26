@@ -51,21 +51,6 @@ def get_pipes(state):
     return configs
 
 
-def _sync_logger_config(pipe):
-    elastic_pipes_logger = logging.getLogger("elastic.pipes")
-    if pipe.logger == elastic_pipes_logger:
-        return
-    for handler in reversed(pipe.logger.handlers):
-        pipe.logger.removeHandler(handler)
-    for handler in elastic_pipes_logger.handlers:
-        pipe.logger.addHandler(handler)
-    level = pipe.config("logging.level", None)
-    if level is None or getattr(elastic_pipes_logger, "overridden", False):
-        pipe.logger.setLevel(elastic_pipes_logger.level)
-    else:
-        pipe.logger.setLevel(level.upper())
-
-
 class Pipe:
     __pipes__ = {}
 
@@ -90,45 +75,23 @@ class Pipe:
         self.func = func
         return partial(run, self)
 
-    @classmethod
-    def run(cls, state, *, dry_run=False):
-        from importlib import import_module
+    def run(self, config, state, dry_run):
         from inspect import signature
 
-        if not state:
-            raise ConfigError("invalid configuration, it's empty")
-
-        logger = logging.getLogger("elastic.pipes.core")
-
-        pipes = get_pipes(state)
-
-        for name, config in pipes:
-            if name in cls.__pipes__:
+        kwargs = {}
+        for name, param in signature(self.func).parameters.items():
+            if name == dry_run:
+                kwargs["dry_run"] = dry_run
                 continue
-            logger.debug(f"loading pipe '{name}'...")
-            import_module(name)
-            if name not in cls.__pipes__:
-                raise ConfigError(f"module does not define a pipe: {name}")
 
-        for name, config in pipes:
-            pipe = cls.__pipes__[name]
-            pipe.__config__ = config
-            pipe.state = state
-            _sync_logger_config(pipe)
-            sig = signature(pipe.func)
-            if "dry_run" in sig.parameters:
-                if dry_run:
-                    logger.debug(f"dry executing pipe '{name}'...")
-                else:
-                    logger.debug(f"executing pipe '{name}'...")
-                pipe.func(pipe, dry_run=dry_run)
-            elif dry_run:
-                logger.debug(f"not executing pipe '{name}'...")
-            else:
-                logger.debug(f"executing pipe '{name}'...")
-                pipe.func(pipe)
-            del pipe.state
-            del pipe.__config__
+        if not dry_run or "dry_run" in kwargs:
+            try:
+                self.__config__ = config
+                self.state = state
+                return self.func(self, **kwargs)
+            finally:
+                del self.__config__
+                del self.state
 
     def config(self, flag, default=NoDefault):
         return get_field(self.__config__, flag, default)
