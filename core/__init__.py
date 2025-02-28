@@ -75,6 +75,10 @@ class Pipe:
         self.func = func
         return partial(run, self)
 
+    @classmethod
+    def find(cls, name):
+        return cls.__pipes__[name]
+
     def run(self, config, state, dry_run, logger):
         from inspect import signature
 

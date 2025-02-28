@@ -1,3 +1,5 @@
 black
 isort
+pytest
 ruff
+typer

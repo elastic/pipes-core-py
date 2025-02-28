@@ -11,6 +11,8 @@ ifeq ($(USERNAME),)
 	USERNAME := $(USER)
 endif
 
+PYTEST_FLAGS_ := $(strip $(if $(filter-out 0,$(V)),-v -s,-q) $(PYTEST_FLAGS))
+
 all: lint
 
 prereq:
@@ -22,12 +24,17 @@ lint:
 	$(PYTHON) -m isort -q --check . || ($(PYTHON) -m isort .; false)
 
 test: FORCE
+	$(PYTHON) -m pytest $(PYTEST_FLAGS_) test
+
+test/venv:
 	$(PYTHON) -m venv test/venv
+
+test-venv: test/venv
 	source test/venv/bin/activate; $(MAKE) test-ci
 
 test-ci: FORMATS=json ndjson yaml
 test-ci:
-	pip install .
+	pip install -r requirements.txt .
 	elastic-pipes version
 	elastic-pipes new-pipe -f test/test-pipe.py
 	echo "test-result: ok" | $(PYTHON) test/test-pipe.py | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
@@ -40,8 +47,9 @@ test-ci:
 			echo 'pipes: ["elastic.pipes.core.import": {"field": "documents", "file": "test/docs.$(SRC)"}, "elastic.pipes.core.export": {"field": "documents", "format": "$(DEST)"}]' | elastic-pipes run --log-level=debug - | [ "`$(TEE_STDERR)`" = "`cat test/docs.$(DEST)`" ]; \
 		) \
 	)
+	$(MAKE) test
 
 clean:
-	rm -rf test/venv test/test-pipe.py
+	rm -rf build *.egg-info test/venv test/test-pipe.py
 
 .PHONY: FORCE
