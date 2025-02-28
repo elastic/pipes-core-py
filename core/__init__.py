@@ -65,7 +65,7 @@ class Pipe:
     def __call__(self, func):
         from functools import partial
 
-        from ..runner.standalone import run
+        from .standalone import run
 
         if self.name in self.__pipes__:
             module = self.__pipes__[self.name].func.__module__

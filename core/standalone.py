@@ -17,9 +17,9 @@
 import logging
 import sys
 
-from ..core import get_pipes
-from ..core.errors import Error
-from ..core.util import deserialize_yaml, fatal, serialize_yaml, warn_interactive
+from . import get_pipes
+from .errors import Error
+from .util import deserialize_yaml, fatal, serialize_yaml, warn_interactive
 
 
 def receive_state_from_unix_pipe(logger, default):

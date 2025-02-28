@@ -21,7 +21,7 @@ from pathlib import Path
 import typer
 from typing_extensions import Annotated
 
-from ..core.util import fatal, get_field, warn_interactive
+from .util import fatal, get_field, warn_interactive
 
 main = typer.Typer(pretty_exceptions_enable=False)
 
@@ -73,9 +73,9 @@ def run(
     from importlib import import_module
     from inspect import signature
 
-    from ..core import Pipe, get_pipes
-    from ..core.errors import Error
-    from ..core.util import deserialize_yaml
+    from . import Pipe, get_pipes
+    from .errors import Error
+    from .util import deserialize_yaml
 
     try:
         warn_interactive(config_file)

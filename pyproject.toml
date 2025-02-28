@@ -34,14 +34,13 @@ Homepage = "https://github.com/elastic/pipes-py"
 version = {attr = "core.__version__"}
 
 [project.scripts]
-elastic-pipes = "elastic.pipes.runner:main"
+elastic-pipes = "elastic.pipes.core.runner:main"
 
 [tool.setuptools]
-packages = ["elastic.pipes.core", "elastic.pipes.runner"]
+packages = ["elastic.pipes.core"]
 
 [tool.setuptools.package-dir]
 "elastic.pipes.core" = "core"
-"elastic.pipes.runner" = "runner"
 
 [tool.black]
 line-length = 140
