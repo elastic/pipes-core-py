@@ -117,6 +117,7 @@ def run(
         base_dir = Path(config_file.name).parent
     base_dir = str(base_dir.absolute())
     if base_dir not in sys.path:
+        logger.debug(f"adding '{base_dir}' to the search path")
         sys.path.append(base_dir)
 
     state.setdefault("runtime", {}).update(
@@ -131,11 +132,23 @@ def run(
 
     pipes = get_pipes(state)
 
+    if pipes:
+        name, config = pipes[0]
+        if name == "elastic.pipes":
+            for path in get_field(config, "search-path", None) or []:
+                path = str(Path(base_dir) / path)
+                if path not in sys.path:
+                    logger.debug(f"adding '{path}' to the search path")
+                    sys.path.append(path)
+
     for name, config in pipes:
         if name in Pipe.__pipes__:
             continue
         logger.debug(f"loading pipe '{name}'...")
-        import_module(name)
+        try:
+            import_module(name)
+        except ModuleNotFoundError as e:
+            fatal(f"cannot load pipe '{name}': cannot find module: '{e.name}'")
         if name not in Pipe.__pipes__:
             fatal(f"module does not define a pipe: {name}")
 
