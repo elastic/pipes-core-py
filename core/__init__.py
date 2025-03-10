@@ -138,16 +138,16 @@ class Pipe:
     def config(self, flag, default=NoDefault):
         return get_field(self.__config__, flag, default)
 
-    def get_es(self):
+    def get_es(self, stack):
         from elasticsearch import Elasticsearch
 
-        shell_expand = get_field(self.state, "stack.shell-expand", False)
-        api_key = get_field(self.state, "stack.credentials.api-key", shell_expand=shell_expand)
-        username = get_field(self.state, "stack.credentials.username", shell_expand=shell_expand)
-        password = get_field(self.state, "stack.credentials.password", shell_expand=shell_expand)
+        shell_expand = get_field(stack, "shell-expand", False)
+        api_key = get_field(stack, "credentials.api-key", shell_expand=shell_expand)
+        username = get_field(stack, "credentials.username", shell_expand=shell_expand)
+        password = get_field(stack, "credentials.password", shell_expand=shell_expand)
 
         args = {
-            "hosts": get_field(self.state, "stack.elasticsearch.url", shell_expand=shell_expand),
+            "hosts": get_field(stack, "elasticsearch.url", shell_expand=shell_expand),
         }
         if api_key:
             args["api_key"] = api_key
@@ -155,16 +155,16 @@ class Pipe:
             args["basic_auth"] = (username, password)
         return Elasticsearch(**args)
 
-    def get_kb(self):
+    def get_kb(self, stack):
         from .kibana import Kibana
 
-        shell_expand = get_field(self.state, "stack.shell-expand", False)
-        api_key = get_field(self.state, "stack.credentials.api-key", shell_expand=shell_expand)
-        username = get_field(self.state, "stack.credentials.username", shell_expand=shell_expand)
-        password = get_field(self.state, "stack.credentials.password", shell_expand=shell_expand)
+        shell_expand = get_field(stack, "shell-expand", False)
+        api_key = get_field(stack, "credentials.api-key", shell_expand=shell_expand)
+        username = get_field(stack, "credentials.username", shell_expand=shell_expand)
+        password = get_field(stack, "credentials.password", shell_expand=shell_expand)
 
         args = {
-            "url": get_field(self.state, "stack.kibana.url", shell_expand=shell_expand),
+            "url": get_field(stack, "kibana.url", shell_expand=shell_expand),
         }
         if api_key:
             args["api_key"] = api_key
