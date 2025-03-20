@@ -1,10 +1,12 @@
+PYTHON ?= python3
+
 SHELL := bash
 TEE_STDERR := tee >(cat 1>&2)
 
-ifneq ($(VENV),)
-	PYTHON ?= $(VENV)/bin/python3
+ifneq ($(findstring MSYS_NT,$(shell uname)),)
+	ACTIVATE = $(VENV)/scripts/Activate.bat
 else
-	PYTHON ?= python3
+	ACTIVATE = source $(VENV)/bin/activate
 endif
 
 ifeq ($(USERNAME),)
@@ -26,15 +28,26 @@ lint:
 test: FORCE
 	$(PYTHON) -m pytest $(PYTEST_FLAGS_) test
 
-test/venv:
-	$(PYTHON) -m venv test/venv
+$(VENV):
+	$(PYTHON) -m venv $@
 
-test-venv: test/venv
-	source test/venv/bin/activate; $(MAKE) test-ci
+test-venv: VENV := test/venv
+test-venv: $(VENV)
+	$(ACTIVATE); $(MAKE) test-ci
 
 test-ci: FORMATS=json ndjson yaml
 test-ci:
 	pip install -r requirements.txt .
+	$(MAKE) pkg-test
+	$(MAKE) test
+
+pkg-build:
+	$(PYTHON) -m build
+
+pkg-install:
+	$(PYTHON) -m pip install --force-reinstall dist/elastic_pipes-*.whl
+
+pkg-test:
 	elastic-pipes version
 	elastic-pipes new-pipe -f test/test-pipe.py
 	echo "test-result: ok" | $(PYTHON) test/test-pipe.py | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
@@ -47,7 +60,13 @@ test-ci:
 			echo 'pipes: ["elastic.pipes.core.import": {"field": "documents", "file": "test/docs.$(SRC)"}, "elastic.pipes.core.export": {"field": "documents", "format": "$(DEST)"}]' | elastic-pipes run --log-level=debug - | [ "`$(TEE_STDERR)`" = "`cat test/docs.$(DEST)`" ]; \
 		) \
 	)
-	$(MAKE) test
+
+package: VENV := test/venv
+package: pkg-build
+	rm -rf $(VENV)
+	$(PYTHON) -m venv $(VENV)
+	$(ACTIVATE); $(MAKE) pkg-install pkg-test
+	rm -rf $(VENV)
 
 clean:
 	rm -rf build *.egg-info test/venv test/test-pipe.py
