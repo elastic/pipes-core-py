@@ -32,6 +32,42 @@ else:
             yield chunk
 
 
+def get_es_client(stack):
+    from elasticsearch import Elasticsearch
+
+    shell_expand = get_field(stack, "shell-expand", False)
+    api_key = get_field(stack, "credentials.api-key", shell_expand=shell_expand)
+    username = get_field(stack, "credentials.username", shell_expand=shell_expand)
+    password = get_field(stack, "credentials.password", shell_expand=shell_expand)
+
+    args = {
+        "hosts": get_field(stack, "elasticsearch.url", shell_expand=shell_expand),
+    }
+    if api_key:
+        args["api_key"] = api_key
+    elif username:
+        args["basic_auth"] = (username, password)
+    return Elasticsearch(**args)
+
+
+def get_kb_client(stack):
+    from .kibana import Kibana
+
+    shell_expand = get_field(stack, "shell-expand", False)
+    api_key = get_field(stack, "credentials.api-key", shell_expand=shell_expand)
+    username = get_field(stack, "credentials.username", shell_expand=shell_expand)
+    password = get_field(stack, "credentials.password", shell_expand=shell_expand)
+
+    args = {
+        "url": get_field(stack, "kibana.url", shell_expand=shell_expand),
+    }
+    if api_key:
+        args["api_key"] = api_key
+    elif username:
+        args["basic_auth"] = (username, password)
+    return Kibana(**args)
+
+
 def get_field(dict, path, default=NoDefault, *, shell_expand=False):
     if path in (None, "", "."):
         return dict

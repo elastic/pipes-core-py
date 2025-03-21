@@ -138,39 +138,17 @@ class Pipe:
     def config(self, flag, default=NoDefault):
         return get_field(self.__config__, flag, default)
 
-    def get_es(self, stack):
-        from elasticsearch import Elasticsearch
+    def get_es(self):
+        from .util import get_es_client
 
-        shell_expand = get_field(stack, "shell-expand", False)
-        api_key = get_field(stack, "credentials.api-key", shell_expand=shell_expand)
-        username = get_field(stack, "credentials.username", shell_expand=shell_expand)
-        password = get_field(stack, "credentials.password", shell_expand=shell_expand)
+        stack = get_field(self.state, "stack")
+        return get_es_client(stack)
 
-        args = {
-            "hosts": get_field(stack, "elasticsearch.url", shell_expand=shell_expand),
-        }
-        if api_key:
-            args["api_key"] = api_key
-        elif username:
-            args["basic_auth"] = (username, password)
-        return Elasticsearch(**args)
+    def get_kb(self):
+        from .util import get_kb_client
 
-    def get_kb(self, stack):
-        from .kibana import Kibana
-
-        shell_expand = get_field(stack, "shell-expand", False)
-        api_key = get_field(stack, "credentials.api-key", shell_expand=shell_expand)
-        username = get_field(stack, "credentials.username", shell_expand=shell_expand)
-        password = get_field(stack, "credentials.password", shell_expand=shell_expand)
-
-        args = {
-            "url": get_field(stack, "kibana.url", shell_expand=shell_expand),
-        }
-        if api_key:
-            args["api_key"] = api_key
-        elif username:
-            args["basic_auth"] = (username, password)
-        return Kibana(**args)
+        stack = get_field(self.state, "stack")
+        return get_kb_client(stack)
 
     class Node:
         def __init__(self, node):
