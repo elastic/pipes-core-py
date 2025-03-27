@@ -35,13 +35,13 @@ else:
 def get_es_client(stack):
     from elasticsearch import Elasticsearch
 
-    shell_expand = get_field(stack, "shell-expand", False)
-    api_key = get_field(stack, "credentials.api-key", shell_expand=shell_expand)
-    username = get_field(stack, "credentials.username", shell_expand=shell_expand)
-    password = get_field(stack, "credentials.password", shell_expand=shell_expand)
+    shell_expand = get_node(stack, "shell-expand", False)
+    api_key = get_node(stack, "credentials.api-key", shell_expand=shell_expand)
+    username = get_node(stack, "credentials.username", shell_expand=shell_expand)
+    password = get_node(stack, "credentials.password", shell_expand=shell_expand)
 
     args = {
-        "hosts": get_field(stack, "elasticsearch.url", shell_expand=shell_expand),
+        "hosts": get_node(stack, "elasticsearch.url", shell_expand=shell_expand),
     }
     if api_key:
         args["api_key"] = api_key
@@ -53,13 +53,13 @@ def get_es_client(stack):
 def get_kb_client(stack):
     from .kibana import Kibana
 
-    shell_expand = get_field(stack, "shell-expand", False)
-    api_key = get_field(stack, "credentials.api-key", shell_expand=shell_expand)
-    username = get_field(stack, "credentials.username", shell_expand=shell_expand)
-    password = get_field(stack, "credentials.password", shell_expand=shell_expand)
+    shell_expand = get_node(stack, "shell-expand", False)
+    api_key = get_node(stack, "credentials.api-key", shell_expand=shell_expand)
+    username = get_node(stack, "credentials.username", shell_expand=shell_expand)
+    password = get_node(stack, "credentials.password", shell_expand=shell_expand)
 
     args = {
-        "url": get_field(stack, "kibana.url", shell_expand=shell_expand),
+        "url": get_node(stack, "kibana.url", shell_expand=shell_expand),
     }
     if api_key:
         args["api_key"] = api_key
@@ -68,7 +68,7 @@ def get_kb_client(stack):
     return Kibana(**args)
 
 
-def get_field(dict, path, default=NoDefault, *, shell_expand=False):
+def get_node(dict, path, default=NoDefault, *, shell_expand=False):
     if path in (None, "", "."):
         return dict
     keys = path.split(".")
@@ -93,7 +93,7 @@ def get_field(dict, path, default=NoDefault, *, shell_expand=False):
     return dict
 
 
-def set_field(dict, path, value):
+def set_node(dict, path, value):
     if path in (None, "", "."):
         dict.clear()
         dict.update(value)
