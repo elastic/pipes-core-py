@@ -94,7 +94,7 @@ class Pipe:
     def find(cls, name):
         return cls.__pipes__[name]
 
-    def run(self, config, state, dry_run, logger):
+    def run(self, config, state, dry_run, logger, exit_stack):
         from inspect import signature
 
         sync_logger_config(self.logger, config)
@@ -119,6 +119,8 @@ class Pipe:
                         kwargs[name] = self
                     elif issubclass(param.annotation, logging.Logger):
                         kwargs[name] = self.logger
+                    elif issubclass(param.annotation, ExitStack):
+                        kwargs[name] = exit_stack
                     elif issubclass(param.annotation, Pipe.Context):
                         kwargs[name] = param.annotation.bind(stack, config, state, logger)
                     continue
