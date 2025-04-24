@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 
 import typer
@@ -116,11 +117,12 @@ def run(
         if name not in Pipe.__pipes__:
             fatal(f"module does not define a pipe: {name}")
 
-    for name, config in pipes:
-        try:
-            Pipe.find(name).run(config, state, dry_run, logger)
-        except Error as e:
-            fatal(e)
+    with ExitStack() as stack:
+        for name, config in pipes:
+            try:
+                Pipe.find(name).run(config, state, dry_run, logger, stack)
+            except Error as e:
+                fatal(e)
 
 
 @main.command()

@@ -16,6 +16,7 @@
 
 import logging
 import sys
+from contextlib import ExitStack
 
 from . import get_pipes
 from .errors import Error
@@ -72,7 +73,8 @@ def run(pipe):
 
         configs = [c for n, c in pipes if n == pipe.name]
         config = configs[0] if configs else {}
-        ret = pipe.run(config, state, dry_run, logger)
+        with ExitStack() as stack:
+            ret = pipe.run(config, state, dry_run, logger, stack)
         send_state_to_unix_pipe(pipe.logger, state)
         return ret
 

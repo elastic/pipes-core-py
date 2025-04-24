@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+from contextlib import ExitStack
 
 import pytest
 from typing_extensions import Annotated, Any, get_args
@@ -23,7 +24,8 @@ from core.errors import ConfigError, Error
 
 
 def run(name, config, state, *, dry_run=False):
-    Pipe.find(name).run(config, state, dry_run, logger)
+    with ExitStack() as stack:
+        Pipe.find(name).run(config, state, dry_run, logger, stack)
 
 
 def test_dry_run():
@@ -226,8 +228,10 @@ def test_ctx():
         ctx.user = "you"
 
     @Pipe("test_ctx_managed")
-    def _(ctx: TestNestedContext):
+    def _(ctx: TestNestedContext, stack: ExitStack):
+        stack.callback(lambda: contexts.remove("exit"))
         assert contexts == ["inner", "outer"]
+        contexts.append("exit")
 
     msg = "config node not found: 'name'"
     with pytest.raises(KeyError, match=msg):
