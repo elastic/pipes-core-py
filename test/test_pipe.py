@@ -98,19 +98,19 @@ def test_config():
     ):
         pass
 
-    msg = "config node not found: 'name'"
-    with pytest.raises(KeyError, match=msg):
+    msg = "param 'name': config node not found: 'name'"
+    with pytest.raises(Error, match=msg):
         run("test_config", {}, {})
 
     run("test_config", {"name": "me"}, {})
 
-    msg = re.escape("config node type mismatch: 'int' (expected 'str')")
+    msg = re.escape("param 'name': config node 'name' type mismatch: 'int' (expected 'str')")
     with pytest.raises(Error, match=msg):
         run("test_config", {"name": 0}, {})
 
     run("test_config_any", {"name": 1}, {})
 
-    msg = re.escape("mutable default config values are not allowed: {}")
+    msg = re.escape("param 'name': mutable default not allowed: {}")
     with pytest.raises(TypeError, match=msg):
         run("test_config_mutable_default", {}, {})
 
@@ -148,19 +148,19 @@ def test_state():
     ):
         pass
 
-    msg = "state node not found: 'name'"
-    with pytest.raises(KeyError, match=msg):
+    msg = "param 'name': state node not found: 'name'"
+    with pytest.raises(Error, match=msg):
         run("test_state", {}, {})
 
     run("test_state", {}, {"name": "me"})
 
-    msg = re.escape("state node type mismatch: 'int' (expected 'str')")
+    msg = re.escape("param 'name': state node 'name' type mismatch: 'int' (expected 'str')")
     with pytest.raises(Error, match=msg):
         run("test_state", {}, {"name": 0})
 
     run("test_state_any", {}, {"name": 1})
 
-    msg = re.escape("mutable default state values are not allowed: {}")
+    msg = re.escape("param 'name': mutable default not allowed: {}")
     with pytest.raises(TypeError, match=msg):
         run("test_state_mutable_default", {}, {})
 
@@ -233,30 +233,30 @@ def test_ctx():
         assert contexts == ["inner", "outer"]
         contexts.append("exit")
 
-    msg = "config node not found: 'name'"
+    msg = "param 'name': config node not found: 'name'"
     with pytest.raises(KeyError, match=msg):
         run("test_ctx", {}, {})
 
-    msg = "state node not found: 'user.name'"
+    msg = "param 'user': state node not found: 'user.name'"
     with pytest.raises(KeyError, match=msg):
         run("test_ctx", {"name": "me"}, {})
 
-    msg = "cannot specify both 'name' and 'name@'"
+    msg = "param 'name': config cannot specify both 'name' and 'name@'"
     with pytest.raises(ConfigError, match=msg):
         run("test_ctx", {"name": "me", "name@": "name"}, {})
 
-    msg = re.escape("config node type mismatch: 'int' (expected 'str')")
+    msg = re.escape("param 'name': config node 'name' type mismatch: 'int' (expected 'str')")
     with pytest.raises(Error, match=msg):
         run("test_ctx", {"name": 0}, {})
 
     run("test_ctx", {"name": "me"}, {"user": {"name": "you"}})
     run("test_ctx_nested", {"name": "me"}, {"user": {"name": "you"}})
 
-    msg = "context 'names' is mutable but not marked as such"
+    msg = "param 'names' is mutable but not marked as such"
     with pytest.raises(AttributeError, match=msg):
         run("test_ctx_immutable", {}, {"names": ["me", "you"]})
 
-    msg = "context 'user' is not mutable"
+    msg = "param 'user' is not mutable"
     with pytest.raises(AttributeError, match=msg):
         run("test_ctx_nested_set2", {}, {})
 

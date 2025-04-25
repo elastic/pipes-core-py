@@ -129,7 +129,10 @@ class Pipe:
                     if isinstance(ann, Pipe.Context):
                         param = Pipe.Context.Param(name, args[0], param.default, param.empty)
                         _, getter, _ = ann.handle_param(param, config, state, logger)
-                        kwargs[name] = getter(None)
+                        try:
+                            kwargs[name] = getter(None)
+                        except KeyError as e:
+                            raise Error(e.args[0])
 
             if not dry_run or "dry_run" in kwargs:
                 return self.func(**kwargs)
@@ -185,11 +188,11 @@ class Pipe:
     class Config(Context):
         def handle_param(self, param, config, state, logger):
             if param.default is not param.empty and is_mutable(param.default):
-                raise TypeError(f"mutable default config values are not allowed: {param.default}")
+                raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
             has_value = has_node(config, self.node)
             has_indirect = has_node(config, _indirect(self.node))
             if has_value and has_indirect:
-                raise ConfigError(f"cannot specify both '{self.node}' and '{_indirect(self.node)}'")
+                raise ConfigError(f"param '{param.name}': config cannot specify both '{self.node}' and '{_indirect(self.node)}'")
             binding = self.Binding()
             if has_indirect:
                 binding.node = get_node(config, _indirect(self.node))
@@ -199,11 +202,11 @@ class Pipe:
                 binding.node = self.node
                 binding.root = config
                 binding.root_name = "config"
-            logger.debug(f"  bind context '{param.name}' to {binding.root_name} node '{binding.node}'")
+            logger.debug(f"  bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
 
             def default_action():
                 if param.default is param.empty:
-                    raise KeyError(f"{binding.root_name} node not found: '{binding.node}'")
+                    raise KeyError(f"param '{param.name}': {binding.root_name} node not found: '{binding.node}'")
                 return param.default
 
             def getter(_):
@@ -212,14 +215,16 @@ class Pipe:
                     return value
                 value_type = type(value).__name__
                 expected_type = param.type.__name__
-                raise Error(f"{binding.root_name} node type mismatch: '{value_type}' (expected '{expected_type}')")
+                raise Error(
+                    f"param '{param.name}': {binding.root_name} node '{binding.node}' type mismatch: '{value_type}' (expected '{expected_type}')"
+                )
 
             def setter(_, value):
                 if binding.node != self.node or binding.root is not config or binding.root_name != "config":
                     binding.node = self.node
                     binding.root = config
                     binding.root_name = "config"
-                    logger.debug(f"  re-bind context '{param.name}' to {binding.root_name} node '{binding.node}'")
+                    logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
                     config.pop(_indirect(self.node))
                 set_node(binding.root, binding.node, value)
 
@@ -235,7 +240,7 @@ class Pipe:
 
         def handle_param(self, param, config, state, logger):
             if param.default is not param.empty and is_mutable(param.default):
-                raise TypeError(f"mutable default state values are not allowed: {param.default}")
+                raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
             if self.indirect:
                 indirect = _indirect(self.node if self.indirect is True else self.indirect)
                 has_indirect = has_node(config, indirect)
@@ -243,9 +248,9 @@ class Pipe:
                 has_indirect = False
             node = get_node(config, indirect) if has_indirect else self.node
             if node is None:
-                logger.debug(f"  bind context '{param.name}' to the whole state")
+                logger.debug(f"  bind param '{param.name}' to the whole state")
             else:
-                logger.debug(f"  bind context '{param.name}' to state node '{node}'")
+                logger.debug(f"  bind param '{param.name}' to state node '{node}'")
 
             binding = self.Binding()
             binding.node = node
@@ -254,28 +259,30 @@ class Pipe:
 
             def default_action():
                 if param.default is param.empty:
-                    raise KeyError(f"state node not found: '{binding.node}'")
+                    raise KeyError(f"param '{param.name}': {binding.root_name} node not found: '{binding.node}'")
                 return param.default
 
             def getter(_):
                 value = get_node(binding.root, binding.node, default_action=default_action)
                 if value is not None and is_mutable(value) and not self.mutable:
-                    raise AttributeError(f"context '{param.name}' is mutable but not marked as such")
+                    raise AttributeError(f"param '{param.name}' is mutable but not marked as such")
                 if value is None or param.type is Any or isinstance(value, param.type):
                     return value
                 value_type = type(value).__name__
                 expected_type = param.type.__name__
-                raise Error(f"state node type mismatch: '{value_type}' (expected '{expected_type}')")
+                raise Error(
+                    f"param '{param.name}': {binding.root_name} node '{binding.node}' type mismatch: '{value_type}' (expected '{expected_type}')"
+                )
 
             def setter(_, value):
                 if not self.mutable:
-                    raise AttributeError(f"context '{param.name}' is not mutable")
+                    raise AttributeError(f"param '{param.name}' is not mutable")
 
                 if binding.node != node or binding.root is not state or binding.root_name != "state":
                     binding.node = node
                     binding.root = state
                     binding.root_name = "state"
-                    logger.debug(f"  re-bind context '{param.name}' to {binding.root_name} node '{binding.node}'")
+                    logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
                 set_node(binding.root, binding.node, value)
 
             return binding, getter, setter
