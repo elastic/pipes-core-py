@@ -119,10 +119,12 @@ def run(
 
     with ExitStack() as stack:
         for name, config in pipes:
+            pipe = Pipe.find(name)
             try:
-                Pipe.find(name).run(config, state, dry_run, logger, stack)
+                pipe.run(config, state, dry_run, logger, stack)
             except Error as e:
-                fatal(e)
+                pipe.logger.critical(e)
+                sys.exit(1)
 
 
 @main.command()
