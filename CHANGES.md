@@ -1,3 +1,22 @@
+## v0.6.0 - May 1, 2025
+
+* Make of Pipe.Context a real Python context manager, it can be used to
+  acquire/release resources before/after the pipe function is executed.
+* Unify standalone and runner logging setup.
+* Make config bindings always mutable, rebind those pointing to some
+  state node so to keep any change local to the own pipe configuration.
+* Optionally provide an ExitStack to the pipe function so to allow
+  clean up activities when the whole pipes script completes.
+* At context binding time, check immediately the parameters. This
+  is to early detect nodes presence and type.
+* Rename what was called "interactive mode" into "UNIX pipe mode"
+  and use `-p` instead of `-i` to activate it (activated by default
+  when the pipe is invoked as part of a UNIX pipe chain).
+* Provide facilities to add help and notes to the pipes, this allow
+  pipes to self-document when invoked from terminal.
+* Add the above annotations to the `core.import`, `core.export`,
+  `hcp.vault.read` and `hcp.vault.write` pipes.
+
 ## v0.5.0 - Apr 17, 2025
 
 * Allow appending `@` to config nodes names to indicate that the value
