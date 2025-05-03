@@ -27,8 +27,7 @@ def main(
 ):
     """Read data from an HCP Vault instance."""
 
-    log.info(f"reading from path '{path}'")
-
+    log.info(f"connect to '{ctx.url}'")
     vc = hvac.Client(url=ctx.url, token=ctx.token)
 
     try:
@@ -39,6 +38,7 @@ def main(
         log.error(e)
         sys.exit(1)
 
+    log.info(f"read from path '{path}'")
     res = vc.read(path)
     if res is None:
         log.error(f"could not read path: '{path}'")
