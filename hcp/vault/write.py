@@ -27,8 +27,7 @@ def main(
 ):
     """Write data to an HCP Vault instance."""
 
-    log.info(f"writing to path '{path}'")
-
+    log.info(f"connect to '{ctx.url}'")
     vc = hvac.Client(url=ctx.url, token=ctx.token)
 
     try:
@@ -39,7 +38,11 @@ def main(
         log.error(e)
         sys.exit(1)
 
-    vc.write_data(path, data=vault)
+    log.info(f"write to path '{path}'")
+    res = vc.write_data(path, data=vault)
+    if res is None:
+        log.error(f"could not write path: '{path}'")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
