@@ -59,7 +59,7 @@ def help_message(pipe):
     from rich.table import Table
     from rich.text import Text
 
-    from . import Pipe, _indirect
+    from . import Pipe
     from .util import walk_contexts, walk_params
 
     pipe_doc = pipe.func.__doc__
@@ -82,10 +82,10 @@ def help_message(pipe):
                 if notes is None:
                     notes = "" if default is empty else f"default: {repr(default)}"
                 state_entries.append([node.node, type.__name__, help, notes])
-            elif node.indirect:
+            elif indirect := node.get_indirect_node_name():
                 if notes is None:
                     notes = f"default: {repr(node.node)}"
-                config_entries.append([_indirect(node.indirect), type.__name__, help, notes])
+                config_entries.append([indirect, type.__name__, help, notes])
 
     notes = []
     if pipe.notes:

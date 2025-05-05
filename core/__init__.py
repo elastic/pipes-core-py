@@ -201,16 +201,20 @@ class Pipe:
             pass
 
     class Config(Node):
+        def get_indirect_node_name(self):
+            return _indirect(self.node)
+
         def handle_param(self, param, config, state, logger):
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
+            indirect = self.get_indirect_node_name()
             has_value = has_node(config, self.node)
-            has_indirect = has_node(config, _indirect(self.node))
+            has_indirect = has_node(config, indirect)
             if has_value and has_indirect:
-                raise ConfigError(f"param '{param.name}': config cannot specify both '{self.node}' and '{_indirect(self.node)}'")
+                raise ConfigError(f"param '{param.name}': config cannot specify both '{self.node}' and '{indirect}'")
             binding = Pipe.Node.Binding()
             if has_indirect:
-                binding.node = get_node(config, _indirect(self.node))
+                binding.node = get_node(config, indirect)
                 binding.root = state
                 binding.root_name = "state"
             else:
@@ -240,7 +244,7 @@ class Pipe:
                     binding.root = config
                     binding.root_name = "config"
                     logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
-                    config.pop(_indirect(self.node))
+                    config.pop(indirect)
                 set_node(binding.root, binding.node, value)
 
             return binding, getter, setter
@@ -255,15 +259,16 @@ class Pipe:
             if node is not None and node.startswith("runtime."):
                 self.indirect = False
 
+        def get_indirect_node_name(self):
+            if self.indirect:
+                return _indirect(self.node if self.indirect is True else self.indirect)
+
         def handle_param(self, param, config, state, logger):
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
-            if self.indirect:
-                indirect = _indirect(self.node if self.indirect is True else self.indirect)
-                has_indirect = has_node(config, indirect)
-            else:
-                has_indirect = False
-            node = get_node(config, indirect) if has_indirect else self.node
+            node = self.node
+            if indirect := self.get_indirect_node_name():
+                node = get_node(config, indirect, node)
             if node is None:
                 logger.debug(f"  bind param '{param.name}' to the whole state")
             else:
