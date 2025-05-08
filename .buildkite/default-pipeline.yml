@@ -1,0 +1,4 @@
+steps:
+  - label: "A true test"
+    command:
+      - true
