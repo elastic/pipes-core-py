@@ -1,6 +1,6 @@
 ---
 steps:
-  - label: "Triggering pipelines"
+  - label: "Execute main pipeline"
     plugins:
       monorepo-diff#v1.3.0:
         diff: ".buildkite/diff ${BUILDKITE_COMMIT}"
@@ -22,5 +22,5 @@ steps:
                 image: "docker.elastic.co/ci-agent-images/pipelib:0.13.0@sha256:190464950de81cb3390bd5e07bb1cc171dd4a765c1ce5de58ebca476f9a6839f"
           - default:
               config:
-                label: ":pipeline: Upload default Pipeline"
-                command: "buildkite-agent pipeline upload .buildkite/default-pipeline.yml"
+                label: "Upload public trigger pipeline"
+                command: "buildkite-agent pipeline upload .buildkite/pipelines/public-trigger.yml"

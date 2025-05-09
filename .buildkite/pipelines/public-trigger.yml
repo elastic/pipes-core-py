@@ -1,0 +1,9 @@
+---
+steps:
+  - label: "Execute public trigger pipeline"
+    trigger: "pipes-public-py-trigger"
+    build:
+      message: "$BUILDKITE_MESSAGE"
+      env:
+        PUBLIC_COMMIT: "$BUILDKITE_COMMIT"
+        PUBLIC_BRANCH: "$BUILDKITE_BRANCH"
