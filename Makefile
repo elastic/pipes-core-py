@@ -53,6 +53,7 @@ pkg-test:
 	$(PYTHON) test/hello.py --describe
 	echo "test-result: ok" | $(PYTHON) test/hello.py | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
 	echo "name: $(USERNAME)" | $(PYTHON) test/hello.py | [ "`$(TEE_STDERR)`" = "name: $(USERNAME)" ]
+	elastic-pipes run --log-level=debug test/test.yaml --explain
 	echo "test-result: ok" | elastic-pipes run --log-level=debug test/test.yaml | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
 	cat test/test.yaml | elastic-pipes run --log-level=debug - | [ "`$(TEE_STDERR)`" = "{}" ]
 	@$(foreach SRC,$(FORMATS), \
