@@ -115,10 +115,50 @@ def load_pipes(state, logger):
     return [(Pipe.find(name), config) for name, config in pipes]
 
 
+def explain_everything(pipes, logger):
+    from rich import print
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+
+    from .util import walk_config_nodes
+
+    arguments = {}
+    for pipe, root_name, node, help, notes, type, name, arg_name in walk_config_nodes(pipes, "runtime.arguments."):
+        logger.debug(f"pipe: {pipe.name}, root: {root_name}, help: {help}, param name: {name}, arg name: {arg_name}")
+        arguments.setdefault(arg_name, []).append((pipe, node, help, type, name))
+
+    environment = {}
+    for pipe, root_name, node, help, notes, type, name, arg_name in walk_config_nodes(pipes, "runtime.environment."):
+        logger.debug(f"pipe: {pipe.name}, root: {root_name}, help: {help}, param name: {name}, arg name: {arg_name}")
+        environment.setdefault(arg_name, []).append((pipe, node, help, type, name))
+
+    def _render_panel(title, entries):
+        table = Table(show_header=False, box=None, expand=False)
+        for arg in sorted(entries):
+            subtable = Table(show_header=False, box=None, expand=False)
+            for pipe, node, help, type, name in entries[arg]:
+                subtable.add_row(
+                    Text("*", style="bold green"),
+                    f"{help} in [i]{pipe.func.__doc__}[/i]",
+                )
+            table.add_row(
+                Text(arg, style="bold cyan"),
+                subtable,
+            )
+        if not entries:
+            table.add_row("[i]none[/i]")
+        return Panel(table, title=title, title_align="left", border_style="dim")
+
+    print(_render_panel("Arguments", arguments))
+    print(_render_panel("Environment", environment))
+
+
 @main.command()
 def run(
     config_file: typer.FileText,
     dry_run: Annotated[bool, typer.Option()] = False,
+    explain: Annotated[bool, typer.Option(help="Describe what the script does.")] = False,
     log_level: Annotated[str, typer.Option(callback=setup_logging("INFO"))] = None,
     arguments: Annotated[Optional[List[str]], typer.Option("--argument", "-a", help="Pass an argument to the Pipes runtime.")] = None,
 ):
@@ -142,6 +182,10 @@ def run(
         fatal("invalid configuration, it's empty")
 
     pipes = configure_runtime(state, config_file, arguments, os.environ, logger)
+
+    if explain:
+        explain_everything(pipes, logger)
+        sys.exit(0)
 
     for pipe, config in pipes:
         try:
@@ -187,8 +231,13 @@ def main(
     name: Annotated[
         str,
         Pipe.State("name"),
-        Pipe.Help("to whom say hello"),
+        Pipe.Help("whom to say hello"),
     ] = "world",
+    age: Annotated[
+        int,
+        Pipe.State("age"),
+        Pipe.Help("age of whom to say hello"),
+    ] = -1,
     dry_run: bool = False,
 ):
     \"\"\"Say hello to someone.\"\"\"

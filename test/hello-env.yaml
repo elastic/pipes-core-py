@@ -1,0 +1,10 @@
+#!/usr/bin/env -S elastic-pipes run
+
+pipes:
+  - hello:
+      name@: runtime.environment.NAME
+      age@: runtime.environment.AGE
+
+runtime:
+  environment:
+    NAME: unknown
