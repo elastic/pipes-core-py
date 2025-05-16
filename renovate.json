@@ -7,7 +7,10 @@
     {
       "matchPackageNames": [
         "actions/checkout",
-        "actions/setup-python"
+        "actions/download-artifact",
+        "actions/setup-python",
+        "actions/upload-artifact",
+        "pypa/gh-action-pypi-publish"
       ],
       "automerge": true
     }
