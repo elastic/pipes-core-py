@@ -15,9 +15,10 @@ classifiers = [
   "Programming Language :: Python",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
   "elasticsearch>=8.2.0",
+  "fastmcp",
   "hvac>=2.0.0",
   "pyyaml",
   "requests",
@@ -38,11 +39,16 @@ version = {attr = "core.__version__"}
 elastic-pipes = "elastic.pipes.core.runner:main"
 
 [tool.setuptools]
-packages = ["elastic.pipes.core", "elastic.pipes.hcp.vault"]
+packages = [
+  "elastic.pipes.core",
+  "elastic.pipes.hcp.vault",
+  "elastic.pipes.mcp",
+]
 
 [tool.setuptools.package-dir]
 "elastic.pipes.core" = "core"
 "elastic.pipes.hcp.vault" = "hcp/vault"
+"elastic.pipes.mcp" = "mcp"
 
 [tool.black]
 line-length = 140
