@@ -147,12 +147,19 @@ def run(pipe):
                 help="Read state from standard input and write state to standard output. This is the default mode when executed in a UNIX pipe.",
             ),
         ] = False,
+        describe: Annotated[
+            bool,
+            typer.Option(
+                "--describe",
+                help="Show detailed info about this pipe.",
+            ),
+        ] = False,
     ):
         logger = logging.getLogger("elastic.pipes.core")
 
-        if sys.stdin.isatty() and not pipe_mode:
+        if describe or sys.stdin.isatty() and not pipe_mode:
             help_message(pipe)
-            sys.exit(1)
+            sys.exit(0)
 
         try:
             state = receive_state_from_unix_pipe(pipe.logger, pipe.default)
