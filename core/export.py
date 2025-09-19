@@ -67,7 +67,7 @@ def main(ctx: Ctx, log: Logger, dry_run: bool):
     log.info(f"exporting {msg_state} to {msg_file_name}...")
 
     if ctx.file_name:
-        with open(ctx.file_name, "w") as f:
+        with Path(ctx.file_name).expanduser().open("w") as f:
             serialize(f, ctx.state, format=format)
     else:
         serialize(sys.stdout, ctx.state, format=format)

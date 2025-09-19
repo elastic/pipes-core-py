@@ -75,7 +75,7 @@ def main(ctx: Ctx, log: Logger, dry_run: bool):
     log.info(f"importing {msg_state} from {msg_file_name}...")
 
     if ctx.file_name:
-        with open(ctx.file_name, "r") as f:
+        with Path(ctx.file_name).expanduser().open("r") as f:
             warn_interactive(f)
             ctx.state = deserialize(f, format=format) or {}
     else:
