@@ -209,8 +209,7 @@ def deserialize(file, *, format):
 
 
 def fatal(msg):
-    print(msg, file=sys.stderr)
-    sys.exit(1)
+    sys.exit(msg)
 
 
 def warn_interactive(f):
