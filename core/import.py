@@ -67,22 +67,18 @@ class Ctx(Pipe.Context):
         if self.streaming and not self.in_memory_state:
             raise ConfigError("cannot use streaming import in UNIX pipe mode")
 
+        if self.format is None:
+            if self.file_name:
+                self.format = Path(self.file_name).suffix.lower()[1:]
+                self.logger.debug(f"import file format guessed from file extension: {self.format}")
+            else:
+                self.format = "yaml"
+                self.logger.debug(f"assuming import file format: {self.format}")
+
 
 @Pipe("elastic.pipes.core.import")
-def main(ctx: Ctx, stack: ExitStack, log: Logger, dry_run: bool):
+def main(ctx: Ctx, stack: ExitStack, log: Logger):
     """Import data from file or standard input."""
-
-    format = ctx.format
-    if format is None:
-        if ctx.file_name:
-            format = Path(ctx.file_name).suffix.lower()[1:]
-            log.debug(f"import file format guessed from file extension: {format}")
-        else:
-            format = "yaml"
-            log.debug(f"assuming import file format: {format}")
-
-    if dry_run:
-        return
 
     node = ctx.get_binding("state").node
     msg_state = "everything" if node is None else f"'{node}'"
@@ -95,7 +91,7 @@ def main(ctx: Ctx, stack: ExitStack, log: Logger, dry_run: bool):
         f = sys.stdin
 
     warn_interactive(f)
-    ctx.state = deserialize(f, format=format, streaming=ctx.streaming) or {}
+    ctx.state = deserialize(f, format=ctx.format, streaming=ctx.streaming) or {}
 
 
 if __name__ == "__main__":
