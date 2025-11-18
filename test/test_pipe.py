@@ -22,14 +22,12 @@ from typing_extensions import Annotated, Any, get_args
 from core import CommonContext, Pipe, get_pipes
 from core.errors import ConfigError, Error
 
-from .util import logger
-
 
 def run(name, config, state, *, dry_run=False):
-    with ExitStack() as stack:
-        pipe = Pipe.find(name)
-        pipe.check_config(config)
-        pipe.run(config, state, dry_run, logger, stack)
+    from .util import run as run_
+
+    with run_(name, config, state, dry_run=dry_run) as _:
+        pass
 
 
 def test_dry_run():
