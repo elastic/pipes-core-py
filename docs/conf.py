@@ -9,7 +9,7 @@ from core import __version__
 
 # -- Project information -----------------------------------------------------
 
-project = "Elastic Pipes"
+project = "Elastic Pipes Core"
 copyright = "2025, Elasticsearch B.V."
 author = "Domenico Andreoli"
 

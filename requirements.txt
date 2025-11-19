@@ -3,4 +3,6 @@ build
 isort
 pytest
 ruff
+sphinx>=7.0
+sphinx-rtd-theme>=2.0
 typer
