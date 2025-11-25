@@ -1,9 +1,0 @@
-env:
-  EC_API: 'https://api.elastic-cloud.com/api/v1'
-
-steps:
-  - label: "A public test"
-    command:
-      - 'EC_API_KEY=$(buildkite-agent meta-data get "ec-api-key")'
-      - 'ID=$(curl -s -H "Authorization: ApiKey $$EC_API_KEY" "$EC_API/account" | tee /dev/stderr | jq -r ".id // empty")'
-      - '[ -n "$$ID" ]'
