@@ -78,7 +78,7 @@ jobs:
         with:
           python-version: "3.8"
 
-      - name: Install Elastic Pipes
+      - name: Install Elastic Pipes Core
         run: pip install .
 
       - name: Run HCP pipes tests
