@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Elastic Pipes component to export data from the Pipes state."""
+"""Export data from state to files or stdout.
+
+The export pipe writes state data in YAML, JSON, or NDJSON format to
+a file or standard output. File format is auto-detected from extension
+or specified explicitly.
+"""
 
 import sys
 from logging import Logger
@@ -25,6 +30,14 @@ from .util import serialize
 
 
 class Ctx(Pipe.Context):
+    """Context for export pipe configuration.
+
+    Attributes:
+        file_name: Output file path, or None for stdout.
+        format: Data format ('yaml', 'json', 'ndjson'), or None to guess from extension.
+        state: State node to export, or whole state if None.
+    """
+
     file_name: Annotated[
         str,
         Pipe.Config("file"),
@@ -34,8 +47,8 @@ class Ctx(Pipe.Context):
     format: Annotated[
         str,
         Pipe.Config("format"),
-        Pipe.Help("data format of the file content (ex. yaml, json, ndjson)"),
-        Pipe.Notes("default: guessed from the file name extension"),
+        Pipe.Help("output format: yaml, json, or ndjson"),
+        Pipe.Notes("default: guessed from file extension, or yaml for stdout"),
     ] = None
     state: Annotated[
         Any,
@@ -47,7 +60,22 @@ class Ctx(Pipe.Context):
 
 @Pipe("elastic.pipes.core.export")
 def main(ctx: Ctx, log: Logger, dry_run: bool):
-    """Export data to file or standard output."""
+    """Export state data to file or stdout.
+
+    Serializes state data in the specified format. If no format is given,
+    guesses from file extension or defaults to YAML.
+
+    Args:
+        ctx: Export configuration context.
+        log: Logger instance.
+        dry_run: If True, skip actual export.
+
+    Example configuration::
+
+        - elastic.pipes.core.export:
+            file: output.json
+            node: results
+    """
 
     format = ctx.format
     if format is None:
