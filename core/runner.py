@@ -22,6 +22,7 @@ from pathlib import Path
 import typer
 from typing_extensions import Annotated, List, Optional
 
+from ._internal import find_and_parse_pyproject_toml, setup_namespace_package
 from .util import fatal, get_node, setup_logging
 
 main = typer.Typer(pretty_exceptions_enable=False)
@@ -71,6 +72,18 @@ def configure_runtime(state, config_file, arguments, environment, logger):
     if base_dir not in sys.path:
         logger.debug(f"adding '{base_dir}' to the search path")
         sys.path.append(base_dir)
+
+    # Check for pyproject.toml with [tool.elastic-pipe] configuration
+    pyproject_config = find_and_parse_pyproject_toml(base_dir, logger)
+    if pyproject_config:
+        elastic_pipe_config, pyproject_dir = pyproject_config
+
+        # Setup namespace package mappings
+        for package_name, package_dir in elastic_pipe_config.items():
+            if isinstance(package_dir, str):
+                # Resolve package directory relative to pyproject.toml location
+                full_path = pyproject_dir / package_dir
+                setup_namespace_package(package_name, full_path, logger)
 
     state.setdefault("runtime", {}).update(
         {

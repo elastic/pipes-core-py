@@ -22,6 +22,7 @@ dependencies = [
   "pyyaml",
   "requests",
   "semver",
+  "tomli>=1.2.0; python_version < '3.11'",
   "typer",
   "typing_extensions>=4.12.0",
 ]
