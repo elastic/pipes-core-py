@@ -14,6 +14,7 @@
 
 import os
 import re
+import sys
 from contextlib import contextmanager
 from importlib import import_module
 from types import GeneratorType
@@ -27,28 +28,49 @@ from .util import run
 
 import_module("core.import")
 
+# All (guess, stdio) combinations for export tests
+IMPORT_GUESS_STDIO = [
+    (True, False),
+    (False, True),
+    (False, False),
+]
+IMPORT_GUESS_STDIO_IDS = [f"guess={g},stdio={s}" for g, s in IMPORT_GUESS_STDIO]
+import_params = pytest.mark.parametrize("guess, stdio", IMPORT_GUESS_STDIO, ids=IMPORT_GUESS_STDIO_IDS)
+
 
 @contextmanager
-def run_import(format_, data, *, streaming):
+def run_import(format_, data, *, guess, stdio, streaming):
     from tempfile import NamedTemporaryFile
 
     filename = None
+    old_stdin = None
+    suffix = f".{format_}" if format_ else None
     try:
-        with NamedTemporaryFile(mode="w", delete=False) as f:
-            filename = f.name
-            serialize(f, data, format=format_)
-
         config = {
-            "file": filename,
-            "format": format_,
             "streaming": streaming,
             "node@": "data",
         }
         state = {"data": {}}
 
+        with NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
+            filename = f.name
+            serialize(f, data, format=format_)
+
+        if stdio:
+            old_stdin = sys.stdin
+            sys.stdin = open(filename, "r")
+        else:
+            config["file"] = filename
+
+        if format_ and not guess:
+            config["format"] = format_
+
         with run("core.import", config, state, in_memory_state=streaming) as state:
             yield state["data"]
     finally:
+        if old_stdin:
+            sys.stdin.close()
+            sys.stdin = old_stdin
         if filename:
             os.unlink(filename)
 
@@ -67,39 +89,42 @@ def test_import_streaming_unsupported():
             pass
 
 
-def test_import_yaml():
+@import_params
+def test_import_yaml(guess, stdio):
     data = [{"doc1": "value1"}, {"doc2": "value2"}]
 
-    with run_import("yaml", data, streaming=False) as data_:
+    with run_import("yaml", data, guess=guess, stdio=stdio, streaming=False) as data_:
         assert isinstance(data_, list)
         assert data_ == data
 
     msg = re.escape("cannot stream yaml (try ndjson)")
     with pytest.raises(ConfigError, match=msg):
-        with run_import("yaml", data, streaming=True) as _:
+        with run_import("yaml", data, guess=guess, stdio=stdio, streaming=True) as _:
             pass
 
 
-def test_import_json():
+@import_params
+def test_import_json(guess, stdio):
     data = [{"doc1": "value1"}, {"doc2": "value2"}]
 
-    with run_import("json", data, streaming=False) as data_:
+    with run_import("json", data, guess=guess, stdio=stdio, streaming=False) as data_:
         assert isinstance(data_, list)
         assert data_ == data
 
     msg = re.escape("cannot stream json (try ndjson)")
     with pytest.raises(ConfigError, match=msg):
-        with run_import("json", data, streaming=True) as _:
+        with run_import("json", data, guess=guess, stdio=stdio, streaming=True) as _:
             pass
 
 
-def test_import_ndjson():
+@import_params
+def test_import_ndjson(guess, stdio):
     data = [{"doc1": "value1"}, {"doc2": "value2"}]
 
-    with run_import("ndjson", data, streaming=False) as data_:
+    with run_import("ndjson", data, guess=guess, stdio=stdio, streaming=False) as data_:
         assert isinstance(data_, list)
         assert data_ == data
 
-    with run_import("ndjson", data, streaming=True) as data_:
+    with run_import("ndjson", data, guess=guess, stdio=stdio, streaming=True) as data_:
         assert isinstance(data_, GeneratorType)
         assert list(data_) == data
