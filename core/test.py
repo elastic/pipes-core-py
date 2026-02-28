@@ -22,14 +22,14 @@ from .runner import configure_runtime
 
 
 @contextmanager
-def run(name, config, state, logger, *, arguments=None, environment=None, in_memory_state=False, dry_run=False):
+def run(name, config, state, logger, *, arguments=None, environment=None, in_memory_state=False, dry_run=False, jobs=None):
     pipe = Pipe.find(name)
     pipe.check_config(config, logger)
 
     state = state.copy()
     state["pipes"] = [{name: config}]
 
-    configure_runtime(state, sys.stdin, arguments, environment, logger)
+    configure_runtime(state, sys.stdin, arguments, environment, logger, jobs=jobs)
     state["runtime"]["in-memory-state"] = in_memory_state
 
     with ExitStack() as stack:

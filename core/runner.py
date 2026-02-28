@@ -61,7 +61,7 @@ def configure_runtime_environment(runtime, environment, pipes, logger):
     configure_runtime_args_env(runtime, "environment", environment, pipes, logger)
 
 
-def configure_runtime(state, config_file, arguments, environment, logger):
+def configure_runtime(state, config_file, arguments, environment, logger, *, jobs=None):
     if config_file is sys.stdin:
         base_dir = Path.cwd()
     else:
@@ -72,10 +72,14 @@ def configure_runtime(state, config_file, arguments, environment, logger):
         logger.debug(f"adding '{base_dir}' to the search path")
         sys.path.append(base_dir)
 
+    if jobs is None or jobs < 1:
+        jobs = os.cpu_count()
+
     state.setdefault("runtime", {}).update(
         {
             "base-dir": base_dir,
             "in-memory-state": True,
+            "jobs": jobs,
         }
     )
 
@@ -113,6 +117,27 @@ def load_pipes(state, logger):
             fatal(f"module does not define a pipe: {name}")
 
     return [(Pipe.find(name), config) for name, config in pipes]
+
+
+def schedule_pipes(executor, run_pipe, pipes, logger):
+    from concurrent.futures import wait
+
+    from .util import walk_mutable_states
+
+    dependency_graph = []
+    for pipe, config in pipes:
+        dependency_graph.append((pipe, set(walk_mutable_states(pipe))))
+
+    with ExitStack() as stack:
+        for pipe, config in pipes:
+
+            def _done(fut):
+                logger.debug(f"completed pipe '{pipe.name}'")
+
+            future = executor.submit(run_pipe, pipe, config, stack)
+            future.add_done_callback(_done)
+            yield future
+            wait([future])
 
 
 def explain_everything(pipes, logger):
@@ -161,11 +186,13 @@ def run(
     explain: Annotated[bool, typer.Option(help="Describe what the script does.")] = False,
     log_level: Annotated[str, typer.Option(callback=setup_logging("INFO"))] = None,
     arguments: Annotated[Optional[List[str]], typer.Option("--argument", "-a", help="Pass an argument to the Pipes runtime.")] = None,
+    jobs: Annotated[Optional[int], typer.Option("--jobs", "-j", help="Number of jobs to run in parallel.")] = None,
 ):
     """
     Run pipes
     """
     import logging
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     from .errors import Error
     from .util import deserialize_yaml, warn_interactive
@@ -181,7 +208,7 @@ def run(
     if not state:
         fatal("invalid configuration, it's empty")
 
-    pipes = configure_runtime(state, config_file, arguments, os.environ, logger)
+    pipes = configure_runtime(state, config_file, arguments, os.environ, logger, jobs=jobs)
 
     if explain:
         explain_everything(pipes, logger)
@@ -195,12 +222,21 @@ def run(
             logger.critical(f"{pipe.name}: {e}")
             sys.exit(1)
 
-    with ExitStack() as stack:
-        for pipe, config in pipes:
-            try:
-                pipe.run(config, state, dry_run, logger, stack)
-            except Error as e:
-                pipe.logger.critical(e)
+    def run_pipe(pipe, config, stack):
+        try:
+            pipe.run(config, state, dry_run, logger, stack)
+        except Error as e:
+            return (pipe, e)
+
+    jobs = get_node(state, "runtime.jobs")
+    logger.debug(f"scheduling pipes with {jobs} jobs...")
+
+    with ThreadPoolExecutor(max_workers=jobs) as executor:
+        for future in as_completed(schedule_pipes(executor, run_pipe, pipes, logger)):
+            result = future.result()
+            if result is not None:
+                pipe, error = result
+                pipe.logger.critical(error)
                 sys.exit(1)
 
 

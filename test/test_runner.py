@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import re
+import sys
 from collections import namedtuple
 from contextlib import nullcontext
 
@@ -204,3 +206,33 @@ def test_runtime_environment(tc):
                 assert state["runtime"]["environment"] == tc.exp
             else:
                 assert "environment" not in state["runtime"]
+
+
+@pytest.mark.parametrize(
+    "jobs, expected_jobs",
+    [
+        (None, os.cpu_count()),
+        (-1, os.cpu_count()),
+        (0, os.cpu_count()),
+        (1, 1),
+        (4, 4),
+    ],
+)
+def test_jobs_count(jobs, expected_jobs):
+    from core.runner import configure_runtime
+
+    from .util import logger
+
+    state = {}
+
+    pipes = configure_runtime(
+        state,
+        sys.stdin,
+        None,
+        None,
+        logger=logger,
+        jobs=jobs,
+    )
+
+    assert not pipes
+    assert state["runtime"]["jobs"] == expected_jobs
