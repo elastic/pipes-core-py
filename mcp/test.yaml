@@ -1,0 +1,14 @@
+#!/usr/bin/env -S elastic-pipes run
+
+pipes:
+  - elastic.pipes:
+      logging:
+        level: debug
+
+  - elastic.pipes.mcp:
+      # lazy-dom.git/python && uv run main.py sse
+      url: "http://localhost:8000/sse"
+      tool:
+        name: wake_up
+        args:
+          reason: child cries
