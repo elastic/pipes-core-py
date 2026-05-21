@@ -1,4 +1,5 @@
 PYTHON ?= python3
+JOBS ?= 3  # an arbitrary number of jobs to exercise parallelism
 
 SHELL := bash
 TEE_STDERR := tee >(cat 1>&2)
@@ -53,15 +54,15 @@ pkg-test:
 	$(PYTHON) test/hello.py --describe
 	echo "test-result: ok" | $(PYTHON) test/hello.py | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
 	echo "name: $(USERNAME)" | $(PYTHON) test/hello.py | [ "`$(TEE_STDERR)`" = "name: $(USERNAME)" ]
-	elastic-pipes run --log-level=debug test/hello-arg.yaml --explain
-	elastic-pipes run --log-level=debug test/hello-env.yaml --explain
-	elastic-pipes run --log-level=debug test/test.yaml --explain
-	echo "test-result: ok" | elastic-pipes run --log-level=debug test/test.yaml | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
-	cat test/test.yaml | elastic-pipes run --log-level=debug - | [ "`$(TEE_STDERR)`" = "{}" ]
+	elastic-pipes run -j $(JOBS) --log-level=debug test/hello-arg.yaml --explain
+	elastic-pipes run -j $(JOBS) --log-level=debug test/hello-env.yaml --explain
+	elastic-pipes run -j $(JOBS) --log-level=debug test/test.yaml --explain
+	echo "test-result: ok" | elastic-pipes run -j $(JOBS) --log-level=debug test/test.yaml | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
+	cat test/test.yaml | elastic-pipes run -j $(JOBS) --log-level=debug - | [ "`$(TEE_STDERR)`" = "{}" ]
 	@$(foreach SRC,$(FORMATS), \
 		$(foreach DEST,$(FORMATS), \
 			echo "$(SRC) -> $(DEST)"; \
-			echo $$'pipes: ["elastic.pipes.core.import": {"node@": "documents", "file": "test/docs.$(SRC)"}, "elastic.pipes.core.export": {"node@": "documents", "format": "$(DEST)"}]\ndocuments: []' | elastic-pipes run --log-level=debug - | [ "`$(TEE_STDERR)`" = "`cat test/docs.$(DEST)`" ] || exit 1; \
+			echo $$'pipes: ["elastic.pipes.core.import": {"node@": "documents", "file": "test/docs.$(SRC)"}, "elastic.pipes.core.export": {"node@": "documents", "format": "$(DEST)"}]\ndocuments: []' | elastic-pipes run -j $(JOBS) --log-level=debug - | [ "`$(TEE_STDERR)`" = "`cat test/docs.$(DEST)`" ] || exit 1; \
 		) \
 	)
 

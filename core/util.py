@@ -338,6 +338,14 @@ def walk_params(pipe):
         yield from _walk_ann(param.annotation, param.default, param.empty)
 
 
+def walk_mutable_states(pipe):
+    from . import Pipe
+
+    for node, *_ in walk_params(pipe):
+        if isinstance(node, Pipe.State) and node.mutable:
+            yield node
+
+
 def walk_config_nodes(pipes, prefix):
     """Visit all the config nodes that refer to a state node having the given prefix."""
 
