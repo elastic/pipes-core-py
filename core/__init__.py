@@ -118,7 +118,8 @@ class Pipe:
         for node, type_, *_ in walk_params(self):
             if isinstance(node, Pipe.Config):
                 yield node.node, type_
-                yield node.get_indirect_node_name(), str
+                if indirect := node.get_indirect_node_name():
+                    yield indirect, str
             elif isinstance(node, Pipe.State):
                 if indirect := node.get_indirect_node_name():
                     yield indirect, str
@@ -246,15 +247,20 @@ class Pipe:
             pass
 
     class Config(Node):
+        def __init__(self, node, *, indirect=True):
+            super().__init__(node)
+            self.indirect = indirect
+
         def get_indirect_node_name(self):
-            return _indirect(self.node)
+            if self.indirect:
+                return _indirect(self.node)
 
         def handle_param(self, param, config, state, core_logger):
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
             indirect = self.get_indirect_node_name()
             has_value = has_node(config, self.node)
-            has_indirect = has_node(config, indirect)
+            has_indirect = indirect and has_node(config, indirect)
             if has_value and has_indirect:
                 raise ConfigError(f"param '{param.name}': config cannot specify both '{self.node}' and '{indirect}'")
             binding = Pipe.Node.Binding()
@@ -289,7 +295,8 @@ class Pipe:
                     binding.root = config
                     binding.root_name = "config"
                     core_logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
-                    config.pop(indirect)
+                    if indirect:
+                        config.pop(indirect)
                 set_node(binding.root, binding.node, value)
 
             return binding, getter, setter

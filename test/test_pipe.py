@@ -178,6 +178,26 @@ def test_config_unknown():
         run("test_config_unknown", {"names@": "others"}, {})
 
 
+def test_config_indirect_false():
+    @Pipe("test_config_indirect_false_basic")
+    def _(
+        data: Annotated[str, Pipe.Config("data", indirect=False)],
+    ):
+        assert data == "hello"
+
+    # direct value works
+    run("test_config_indirect_false_basic", {"data": "hello"}, {})
+
+    # data@ is rejected by check_config
+    msg = "unknown config node: 'data@'"
+    with pytest.raises(Error, match=msg):
+        run(
+            "test_config_indirect_false_basic",
+            {"data@": "some.path"},
+            {"some": {"path": "hello"}},
+        )
+
+
 def test_state():
     @Pipe("test_state")
     def _(
