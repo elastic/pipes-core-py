@@ -415,6 +415,131 @@ def test_state_indirect():
     run("test_state_indirect_them", {"user@": "username"}, {"name": "us", "username": "them"})
 
 
+def test_state_dict_assembly():
+    @Pipe("test_state_assembly_basic")
+    def _(
+        data: Annotated[dict, Pipe.State("data", mutable=True)],
+    ):
+        assert data == {"api_key": "abc", "email": "x@y.com"}
+
+    run(
+        "test_state_assembly_basic",
+        {"data": {"api_key@": "creds.key", "email@": "creds.email"}},
+        {"creds": {"key": "abc", "email": "x@y.com"}},
+    )
+
+    @Pipe("test_state_assembly_mixed")
+    def _(
+        data: Annotated[dict, Pipe.State("data", mutable=True)],
+    ):
+        assert data == {"api_key": "abc", "email": "hardcoded@example.com"}
+
+    run(
+        "test_state_assembly_mixed",
+        {"data": {"api_key@": "creds.key", "email": "hardcoded@example.com"}},
+        {"creds": {"key": "abc"}},
+    )
+
+    @Pipe("test_state_assembly_literal_only")
+    def _(
+        data: Annotated[dict, Pipe.State("data", mutable=True)],
+    ):
+        assert data == {"email": "literal@example.com", "role": "admin"}
+
+    run(
+        "test_state_assembly_literal_only",
+        {"data": {"email": "literal@example.com", "role": "admin"}},
+        {},
+    )
+
+    @Pipe("test_state_assembly_conflict")
+    def _(
+        data: Annotated[dict, Pipe.State("data", mutable=True)],
+    ):
+        pass
+
+    msg = "param 'data': config cannot specify both 'data' and 'data@'"
+    with pytest.raises(ConfigError, match=msg):
+        run(
+            "test_state_assembly_conflict",
+            {"data": {"api_key@": "creds.key"}, "data@": "other"},
+            {"creds": {"key": "abc"}, "other": {}},
+        )
+
+    with pytest.raises(ConfigError, match=msg):
+        run(
+            "test_state_assembly_conflict",
+            {"data": ["bad"], "data@": "other"},
+            {"other": {}},
+        )
+
+    @Pipe("test_state_assembly_check_config")
+    def _(
+        data: Annotated[dict, Pipe.State("data", mutable=True)],
+    ):
+        pass
+
+    msg = "unknown config node: 'other.api_key@'"
+    with pytest.raises(Error, match=msg):
+        run("test_state_assembly_check_config", {"other": {"api_key@": "creds.key"}}, {})
+
+    class DataCtx(Pipe.Context):
+        data: Annotated[dict, Pipe.State("data", mutable=True)]
+
+    @Pipe("test_state_assembly_ctx_set")
+    def _(ctx: DataCtx):
+        assert ctx.data == {"api_key": "abc"}
+        ctx.data = {"api_key": "xyz"}
+        # subsequent read returns the value written to state
+        assert ctx.data == {"api_key": "xyz"}
+
+    run(
+        "test_state_assembly_ctx_set",
+        {"data": {"api_key@": "creds.key"}},
+        {"creds": {"key": "abc"}},
+    )
+
+
+def test_config_dict_assembly():
+    @Pipe("test_config_assembly_basic")
+    def _(
+        data: Annotated[dict, Pipe.Config("data")],
+    ):
+        assert data == {"api_key": "abc", "email": "x@y.com"}
+
+    run(
+        "test_config_assembly_basic",
+        {"data": {"api_key@": "creds.key", "email@": "creds.email"}},
+        {"creds": {"key": "abc", "email": "x@y.com"}},
+    )
+
+    @Pipe("test_config_assembly_mixed")
+    def _(
+        data: Annotated[dict, Pipe.Config("data")],
+    ):
+        assert data == {"api_key": "abc", "email": "hardcoded@example.com"}
+
+    run(
+        "test_config_assembly_mixed",
+        {"data": {"api_key@": "creds.key", "email": "hardcoded@example.com"}},
+        {"creds": {"key": "abc"}},
+    )
+
+
+def test_config_indirect_false_assembly():
+    @Pipe("test_config_indirect_false_assembly")
+    def _(
+        data: Annotated[dict, Pipe.Config("data", indirect=False)],
+    ):
+        assert data == {"api_key": "abc", "email": "x@y.com"}
+
+    run(
+        "test_config_indirect_false_assembly",
+        {"data": {"api_key@": "creds.key", "email@": "creds.email"}},
+        {"creds": {"key": "abc", "email": "x@y.com"}},
+    )
+
+
 def test_get_pipes():
     state = None
     pipes = get_pipes(state)
