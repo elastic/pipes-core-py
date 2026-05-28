@@ -123,6 +123,8 @@ class Pipe:
             elif isinstance(node, Pipe.State):
                 if indirect := node.get_indirect_node_name():
                     yield indirect, str
+                if node.node is not None and (type_ is Any or (isinstance(type_, type) and issubclass(type_, Mapping))):
+                    yield node.node, type_
 
     def check_config(self, config, core_logger):
         from .util import split_path, walk_tree
@@ -138,7 +140,11 @@ class Pipe:
                 param_path = split_path(param)
                 if node_path == param_path:
                     break
-                if issubclass(type_, Mapping) and len(param_path) < len(node_path) and all(a == b for a, b in zip(param_path, node_path)):
+                if (
+                    (type_ is Any or issubclass(type_, Mapping))
+                    and len(param_path) < len(node_path)
+                    and all(a == b for a, b in zip(param_path, node_path))
+                ):
                     break
             else:
                 unknown.add(".".join(node_path))
@@ -282,6 +288,14 @@ class Pipe:
             def getter(_):
                 value = get_node(binding.root, binding.node, default_action=default_action)
                 if value is None or param.type is Any or isinstance(value, param.type):
+                    if binding.root is config and isinstance(value, Mapping) and any(k.endswith("@") for k in value):
+                        result = {}
+                        for k, v in value.items():
+                            if k.endswith("@"):
+                                result[k[:-1]] = get_node(state, v)
+                            else:
+                                result[k] = v
+                        return result
                     return value
                 value_type = type(value).__name__
                 expected_type = param.type.__name__
@@ -319,8 +333,59 @@ class Pipe:
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
             node = self.node
+
+            # Assembly mode: config contains the node directly with a Mapping value
+            # whose @-suffixed keys are resolved from state at runtime.
+            assembly_config = None
+            if node is not None and has_node(config, node):
+                config_val = get_node(config, node, None)
+                if isinstance(config_val, Mapping):
+                    assembly_config = config_val
+
             if indirect := self.get_indirect_node_name():
-                node = get_node(config, indirect, node)
+                if assembly_config is not None and has_node(config, indirect):
+                    raise ConfigError(f"param '{param.name}': config cannot specify both '{node}' and '{indirect}'")
+                if assembly_config is None:
+                    node = get_node(config, indirect, node)
+
+            if assembly_config is not None:
+                core_logger.debug(f"  bind param '{param.name}' to assembled dict from config node '{node}'")
+                binding = Pipe.Node.Binding()
+                binding.node = node
+                binding.root = config
+                binding.root_name = "config"
+
+                def getter(_):
+                    if binding.root is state:
+                        # After a set, read back from state directly.
+                        value = get_node(binding.root, binding.node)
+                        if is_mutable(value) and not self.mutable:
+                            raise AttributeError(f"param '{param.name}' is mutable but not marked as such")
+                        return value
+                    if not self.mutable:
+                        raise AttributeError(f"param '{param.name}' is mutable but not marked as such")
+                    # Initial read: assemble from config.
+                    result = {}
+                    for k, v in assembly_config.items():
+                        if k.endswith("@"):
+                            result[k[:-1]] = get_node(state, v)
+                        else:
+                            result[k] = v
+                    if param.type is not Any and not isinstance(result, param.type):
+                        value_type = type(result).__name__
+                        expected_type = param.type.__name__
+                        raise Error(f"param '{param.name}': assembled dict type mismatch: '{value_type}' (expected '{expected_type}')")
+                    return result
+
+                def setter(_, value):
+                    if not self.mutable:
+                        raise AttributeError(f"param '{param.name}' is not mutable")
+                    binding.root = state
+                    binding.root_name = "state"
+                    set_node(state, node, value)
+
+                return binding, getter, setter
+
             if node is None:
                 core_logger.debug(f"  bind param '{param.name}' to the whole state")
             else:

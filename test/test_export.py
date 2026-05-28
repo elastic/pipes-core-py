@@ -150,3 +150,26 @@ def test_export_on_failure_export_on_failure():
     finally:
         if os.path.exists(filename):
             os.unlink(filename)
+
+
+def test_export_data():
+    import io
+
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        config = {
+            "data": {
+                "api_key@": "creds.key",
+                "email": "literal@example.com",
+            }
+        }
+        state = {"creds": {"key": "abc"}}
+        with run("core.export", config, state):
+            pass
+        sys.stdout.flush()
+        result = deserialize(io.StringIO(sys.stdout.getvalue()), format="yaml")
+    finally:
+        sys.stdout = old_stdout
+
+    assert result == {"api_key": "abc", "email": "literal@example.com"}
