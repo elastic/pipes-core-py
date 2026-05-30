@@ -22,6 +22,7 @@ from pathlib import Path
 from typing_extensions import Annotated, Any
 
 from . import Pipe
+from .errors import ConfigError
 from .util import serialize
 
 
@@ -44,11 +45,21 @@ class Ctx(Pipe.Context):
         Pipe.Help("state node containing the source data"),
         Pipe.Notes("default: whole state"),
     ]
+    data: Annotated[
+        dict,
+        Pipe.Config("data", indirect=False),
+        Pipe.Help("assembled data to export; keys suffixed with @ are resolved from state"),
+        Pipe.Notes("default: state node referenced by 'node@', or whole state"),
+    ] = None
     on_failure: Annotated[
         bool,
         Pipe.Config("on-failure"),
         Pipe.Help("export data only when the pipe script has failed"),
     ] = False
+
+    def __init__(self):
+        if self.data is not None and self.get_binding("state").node is not None:
+            raise ConfigError("param 'data' and 'node@' cannot both be specified")
 
 
 @Pipe()
@@ -68,8 +79,14 @@ def main(ctx: Ctx, log: Logger, stack: ExitStack, dry_run: bool):
         if ctx.on_failure and exc_type is None:
             return
 
-        node = ctx.get_binding("state").node
-        msg_state = "everything" if node is None else f"'{node}'"
+        if ctx.data is not None:
+            msg_state = "'data'"
+            exported = ctx.data
+        else:
+            node = ctx.get_binding("state").node
+            msg_state = "everything" if node is None else f"'{node}'"
+            exported = ctx.state
+
         msg_file_name = f"'{ctx.file_name}'" if ctx.file_name else "standard output"
         on_failure = " due to script failure" if ctx.on_failure else ""
 
@@ -81,9 +98,9 @@ def main(ctx: Ctx, log: Logger, stack: ExitStack, dry_run: bool):
 
         if ctx.file_name:
             with Path(ctx.file_name).expanduser().open("w") as f:
-                serialize(f, ctx.state, format=format)
+                serialize(f, exported, format=format)
         else:
-            serialize(sys.stdout, ctx.state, format=format)
+            serialize(sys.stdout, exported, format=format)
 
     if ctx.on_failure:
         log.info("deferring until any script failure...")
