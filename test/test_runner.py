@@ -204,3 +204,55 @@ def test_runtime_environment(tc):
                 assert state["runtime"]["environment"] == tc.exp
             else:
                 assert "environment" not in state["runtime"]
+
+
+def test_runtime_arguments_assembled():
+    @TestPipe
+    def _fn(
+        creds: Annotated[dict, Pipe.Config("creds", indirect=False)],
+    ):
+        assert creds == {"api_key": "secret", "email": "static@example.com"}
+
+    config = {"creds": {"api_key@": "runtime.arguments.API_KEY", "email": "static@example.com"}}
+
+    with _fn(config, {"runtime": {"arguments": {}}}, arguments=["API_KEY=secret"]) as state:
+        assert state["runtime"]["arguments"] == {"API_KEY": "secret"}
+
+
+def test_runtime_environment_assembled():
+    @TestPipe
+    def _fn(
+        creds: Annotated[dict, Pipe.Config("creds", indirect=False)],
+    ):
+        assert creds == {"api_key": "secret"}
+
+    config = {"creds": {"api_key@": "runtime.environment.API_KEY"}}
+
+    with _fn(config, {"runtime": {"environment": {}}}, environment={"API_KEY": "secret"}) as state:
+        assert state["runtime"]["environment"] == {"API_KEY": "secret"}
+
+
+def test_runtime_assembled_literal_eval():
+    @TestPipe
+    def _fn(
+        opts: Annotated[dict, Pipe.Config("opts", indirect=False)],
+    ):
+        assert opts == {"count": 42, "tags": ("a", "b"), "name": "hello"}
+
+    config = {"opts": {"count@": "runtime.arguments.COUNT", "tags@": "runtime.arguments.TAGS", "name@": "runtime.arguments.NAME"}}
+
+    with _fn(config, {}, arguments=["COUNT=42", "TAGS=('a', 'b')", "NAME=hello"]) as state:
+        assert state["runtime"]["arguments"] == {"COUNT": 42, "TAGS": ("a", "b"), "NAME": "hello"}
+
+
+def test_runtime_arguments_assembled_state():
+    @TestPipe
+    def _fn(
+        creds: Annotated[dict, Pipe.State("creds", mutable=True)],
+    ):
+        assert creds == {"api_key": "secret", "email": "static@example.com"}
+
+    config = {"creds": {"api_key@": "runtime.arguments.API_KEY", "email": "static@example.com"}}
+
+    with _fn(config, {}, arguments=["API_KEY=secret"]) as state:
+        assert state["runtime"]["arguments"] == {"API_KEY": "secret"}

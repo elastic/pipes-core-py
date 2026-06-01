@@ -66,7 +66,7 @@ def test_has_node():
     assert not has_node(d, "name.nick")
 
     assert has_node(d, None)
-    assert not has_node({}, None)
+    assert has_node({}, None)
     assert not has_node(None, None)
 
 

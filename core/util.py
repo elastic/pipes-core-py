@@ -19,7 +19,7 @@ import re
 import sys
 from collections.abc import Mapping
 
-from typing_extensions import NoDefault, get_args
+from typing_extensions import Any, NoDefault, get_args
 
 from .errors import ConfigError, Error
 
@@ -98,7 +98,7 @@ def has_node(dict, path):
             dict = dict[key]
         except KeyError:
             return False
-    return dict
+    return dict is not None
 
 
 def get_node(dict, path, default=NoDefault, *, default_action=None, shell_expand=False):
@@ -346,19 +346,36 @@ def walk_config_nodes(pipes, prefix):
     def _get_name(config, indirect):
         if has_node(config, _indirect(indirect)):
             node = get_node(config, _indirect(indirect))
-            if node.startswith(prefix):
+            if isinstance(node, str) and node.startswith(prefix):
                 return node
+
+    def _scan_assembled(config, param_node):
+        """Yield (key_name, arg_name) for @-keyed entries in an assembled dict whose values start with prefix."""
+        if param_node is None:
+            return
+        config_val = get_node(config, param_node, None)
+        if not isinstance(config_val, Mapping):
+            return
+        for k, v in config_val.items():
+            if k.endswith("@") and isinstance(v, str) and v.startswith(prefix):
+                yield f"{param_node}.{k}", v
 
     for pipe, config in pipes:
         for node, _type, help, notes, default, empty in walk_params(pipe):
             if isinstance(node, Pipe.Config):
-                indirect = node.node
-                if arg_name := _get_name(config, indirect):
-                    yield pipe, "config", node, help, notes, _type, indirect, arg_name
-            elif isinstance(node, Pipe.State) and node.indirect:
-                indirect = node.node if node.indirect is True else node.indirect
-                if arg_name := _get_name(config, indirect):
-                    yield pipe, "state", node, help, notes, _type, indirect, arg_name
+                if node.indirect:
+                    indirect = node.node if node.indirect is True else node.indirect
+                    if arg_name := _get_name(config, indirect):
+                        yield pipe, "config", node, help, notes, _type, indirect, arg_name
+                for key_name, arg_name in _scan_assembled(config, node.node):
+                    yield pipe, "config", node, help, notes, Any, key_name, arg_name
+            elif isinstance(node, Pipe.State):
+                if node.indirect:
+                    indirect = node.node if node.indirect is True else node.indirect
+                    if arg_name := _get_name(config, indirect):
+                        yield pipe, "state", node, help, notes, _type, indirect, arg_name
+                for key_name, arg_name in _scan_assembled(config, node.node):
+                    yield pipe, "state", node, help, notes, Any, key_name, arg_name
 
 
 def walk_args_env(pipes, args_env):

@@ -118,10 +118,13 @@ class Pipe:
         for node, type_, *_ in walk_params(self):
             if isinstance(node, Pipe.Config):
                 yield node.node, type_
-                yield node.get_indirect_node_name(), str
+                if indirect := node.get_indirect_node_name():
+                    yield indirect, str
             elif isinstance(node, Pipe.State):
                 if indirect := node.get_indirect_node_name():
                     yield indirect, str
+                if node.node is not None and (type_ is Any or (isinstance(type_, type) and issubclass(type_, Mapping))):
+                    yield node.node, type_
 
     def check_config(self, config, core_logger):
         from .util import split_path, walk_tree
@@ -137,7 +140,11 @@ class Pipe:
                 param_path = split_path(param)
                 if node_path == param_path:
                     break
-                if issubclass(type_, Mapping) and len(param_path) < len(node_path) and all(a == b for a, b in zip(param_path, node_path)):
+                if (
+                    (type_ is Any or (isinstance(type_, type) and issubclass(type_, Mapping)))
+                    and len(param_path) < len(node_path)
+                    and all(a == b for a, b in zip(param_path, node_path))
+                ):
                     break
             else:
                 unknown.add(".".join(node_path))
@@ -246,27 +253,48 @@ class Pipe:
             pass
 
     class Config(Node):
+        def __init__(self, node, *, indirect=True):
+            super().__init__(node)
+            self.indirect = indirect
+
         def get_indirect_node_name(self):
-            return _indirect(self.node)
+            if self.indirect:
+                return _indirect(self.node if self.indirect is True else self.indirect)
 
         def handle_param(self, param, config, state, core_logger):
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
             indirect = self.get_indirect_node_name()
-            has_value = has_node(config, self.node)
-            has_indirect = has_node(config, indirect)
-            if has_value and has_indirect:
-                raise ConfigError(f"param '{param.name}': config cannot specify both '{self.node}' and '{indirect}'")
+
             binding = Pipe.Node.Binding()
-            if has_indirect:
-                binding.node = get_node(config, indirect)
-                binding.root = state
-                binding.root_name = "state"
-            else:
-                binding.node = self.node
+            binding.node = self.node
+            binding.assembly_config = None
+            binding.root = None
+
+            if has_node(config, self.node):
+                if indirect and has_node(config, indirect):
+                    raise ConfigError(f"param '{param.name}': config cannot specify both '{self.node}' and '{indirect}'")
+                value = get_node(config, self.node)
+                if isinstance(value, Mapping):
+                    if any(isinstance(k, str) and k.endswith("@") for k in value):
+                        binding.assembly_config = value
+                        core_logger.debug(f"  bind param '{param.name}' to assembled dict from config node '{self.node}'")
+                    else:
+                        core_logger.debug(f"  bind param '{param.name}' to literal dict from config node '{self.node}'")
                 binding.root = config
                 binding.root_name = "config"
-            core_logger.debug(f"  bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
+
+            if indirect:
+                if binding.root is None and has_node(config, indirect):
+                    binding.node = get_node(config, indirect)
+                    binding.root = state
+                    binding.root_name = "state"
+                    core_logger.debug(f"  bind param '{param.name}' to state node '{binding.node}'")
+
+            if binding.root is None:
+                binding.root = config
+                binding.root_name = "config"
+                core_logger.debug(f"  bind param '{param.name}' to config node '{self.node}'")
 
             def default_action():
                 if param.default is param.empty:
@@ -274,7 +302,18 @@ class Pipe:
                 return param.default
 
             def getter(_):
-                value = get_node(binding.root, binding.node, default_action=default_action)
+                if binding.assembly_config is None:
+                    value = get_node(binding.root, binding.node, default_action=default_action)
+                else:
+                    value = {}
+                    for k, v in binding.assembly_config.items():
+                        if k.endswith("@"):
+                            try:
+                                value[k[:-1]] = get_node(state, v)
+                            except KeyError:
+                                raise KeyError(f"param '{param.name}': state node not found: '{v}'")
+                        else:
+                            value[k] = v
                 if value is None or param.type is Any or isinstance(value, param.type):
                     return value
                 value_type = type(value).__name__
@@ -289,7 +328,9 @@ class Pipe:
                     binding.root = config
                     binding.root_name = "config"
                     core_logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
-                    config.pop(indirect)
+                    if indirect:
+                        config.pop(indirect)
+                binding.assembly_config = None
                 set_node(binding.root, binding.node, value)
 
             return binding, getter, setter
@@ -312,17 +353,39 @@ class Pipe:
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
             node = self.node
-            if indirect := self.get_indirect_node_name():
-                node = get_node(config, indirect, node)
-            if node is None:
-                core_logger.debug(f"  bind param '{param.name}' to the whole state")
-            else:
-                core_logger.debug(f"  bind param '{param.name}' to state node '{node}'")
+            indirect = self.get_indirect_node_name()
 
             binding = Pipe.Node.Binding()
             binding.node = node
-            binding.root = state
-            binding.root_name = "state"
+            binding.assembly_config = None
+            binding.root = None
+
+            if node is not None and has_node(config, node):
+                if indirect and has_node(config, indirect):
+                    raise ConfigError(f"param '{param.name}': config cannot specify both '{node}' and '{indirect}'")
+                value = get_node(config, node, None)
+                if not isinstance(value, Mapping):
+                    raise ConfigError(f"param '{param.name}': config node '{node}' must be a mapping")
+                if any(isinstance(k, str) and k.endswith("@") for k in value):
+                    binding.assembly_config = value
+                    core_logger.debug(f"  bind param '{param.name}' to assembled dict from config node '{node}'")
+                else:
+                    core_logger.debug(f"  bind param '{param.name}' to literal dict from config node '{node}'")
+                binding.root = config
+                binding.root_name = "config"
+
+            if indirect:
+                if binding.root is None:
+                    node = get_node(config, indirect, node)
+                    binding.node = node
+
+            if binding.root is None:
+                binding.root = state
+                binding.root_name = "state"
+                if node is None:
+                    core_logger.debug(f"  bind param '{param.name}' to the whole state")
+                else:
+                    core_logger.debug(f"  bind param '{param.name}' to state node '{node}'")
 
             def default_action():
                 if param.default is param.empty:
@@ -330,7 +393,18 @@ class Pipe:
                 return param.default
 
             def getter(_):
-                value = get_node(binding.root, binding.node, default_action=default_action)
+                if binding.assembly_config is None:
+                    value = get_node(binding.root, binding.node, default_action=default_action)
+                else:
+                    value = {}
+                    for k, v in binding.assembly_config.items():
+                        if k.endswith("@"):
+                            try:
+                                value[k[:-1]] = get_node(state, v)
+                            except KeyError:
+                                raise KeyError(f"param '{param.name}': state node not found: '{v}'")
+                        else:
+                            value[k] = v
                 if value is not None and is_mutable(value) and not self.mutable:
                     raise AttributeError(f"param '{param.name}' is mutable but not marked as such")
                 if value is None or param.type is Any or isinstance(value, param.type):
@@ -344,12 +418,12 @@ class Pipe:
             def setter(_, value):
                 if not self.mutable:
                     raise AttributeError(f"param '{param.name}' is not mutable")
-
                 if binding.node != node or binding.root is not state or binding.root_name != "state":
                     binding.node = node
                     binding.root = state
                     binding.root_name = "state"
                     core_logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
+                binding.assembly_config = None
                 set_node(binding.root, binding.node, value)
 
             return binding, getter, setter
