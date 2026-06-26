@@ -84,6 +84,17 @@ jobs:
       - name: Run HCP pipes tests
         run: make -C hcp test V=1
 
+      - name: Collect container logs
+        if: always()
+        run: make -C hcp logs LOG_DIR=hcp-logs
+
+      - name: Upload container logs
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        with:
+          name: hcp-container-logs-${{ matrix.os }}
+          path: hcp-logs/
+
   build:
     name: Package build (${{ matrix.os }}/py-${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
