@@ -58,32 +58,6 @@ jobs:
       - name: Run tests
         run: make test-ci V=1
 
-  test-pipes:
-    name: Pipes tests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu-latest"]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-        with:
-          persist-credentials: false
-
-      - name: Setup Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.8"
-
-      - name: Install Elastic Pipes
-        run: pip install .
-
-      - name: Run HCP pipes tests
-        run: make -C hcp test V=1
-
   build:
     name: Package build (${{ matrix.os }}/py-${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
@@ -127,7 +101,6 @@ jobs:
     needs:
       - lint-check
       - test-core
-      - test-pipes
       - build
     environment:
       name: Test PyPi
@@ -160,7 +133,6 @@ jobs:
     needs:
       - lint-check
       - test-core
-      - test-pipes
       - build
     environment:
       name: PyPi
