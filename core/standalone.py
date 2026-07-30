@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """Core definitions for stand alone pipes invocation."""
-
 import logging
 import sys
 from contextlib import ExitStack
@@ -73,18 +72,18 @@ def help_message(pipe):
         help = help or ""
         if isinstance(node, Pipe.Config):
             if notes is None:
-                notes = "" if default is empty else f"default: {repr(default)}"
+                notes = "" if default is empty else f"default: {default!r}"
             config_entries.append([node.node, type.__name__, help, notes])
         if isinstance(node, Pipe.State):
             if node.node and node.node.startswith("runtime."):
                 continue
             if node.node is not None:
                 if notes is None:
-                    notes = "" if default is empty else f"default: {repr(default)}"
+                    notes = "" if default is empty else f"default: {default!r}"
                 state_entries.append([node.node, type.__name__, help, notes])
             elif indirect := node.get_indirect_node_name():
                 if notes is None:
-                    notes = f"default: {repr(node.node)}"
+                    notes = f"default: {node.node!r}"
                 config_entries.append([indirect, type.__name__, help, notes])
 
     notes = []

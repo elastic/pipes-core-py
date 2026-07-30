@@ -32,8 +32,8 @@ elif verbosity > 1:
 def run(name, config, state, **kwargs):
     from core.test import run as run_
 
-    with run_(name, config, state, logger, **kwargs) as state:
-        yield state
+    with run_(name, config, state, logger, **kwargs) as result:
+        yield result
 
 
 def TestPipe(fn):

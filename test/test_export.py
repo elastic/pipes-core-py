@@ -41,6 +41,7 @@ def run_export(format_, data, *, guess, stdio):
 
     filename = None
     old_stdout = None
+    out_file = None
     suffix = f".{format_}" if format_ else None
     try:
         config = {"node@": "data"}
@@ -51,7 +52,8 @@ def run_export(format_, data, *, guess, stdio):
 
         if stdio:
             old_stdout = sys.stdout
-            sys.stdout = open(filename, "w")
+            out_file = open(filename, "w")  # noqa: SIM115
+            sys.stdout = out_file
         else:
             config["file"] = filename
 
@@ -65,8 +67,8 @@ def run_export(format_, data, *, guess, stdio):
         with open(filename, "r") as f:
             yield deserialize(f, format=format_)
     finally:
-        if old_stdout:
-            sys.stdout.close()
+        if out_file:
+            out_file.close()
             sys.stdout = old_stdout
         if filename:
             os.unlink(filename)

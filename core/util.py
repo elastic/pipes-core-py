@@ -275,7 +275,9 @@ def setup_logging(default_level="NOTSET"):
     return _handler
 
 
-def walk_tree(value, path=[]):
+def walk_tree(value, path=None):
+    if path is None:
+        path = []
     if isinstance(value, Mapping):
         for k, v in value.items():
             yield from walk_tree(v, path + [k])
@@ -289,10 +291,9 @@ def walk_contexts(pipe):
     from . import Pipe
 
     def _walk_ann(ann):
-        if isinstance(ann, type):
-            if issubclass(ann, Pipe.Context):
-                yield ann
-                yield from _walk_context(ann)
+        if isinstance(ann, type) and issubclass(ann, Pipe.Context):
+            yield ann
+            yield from _walk_context(ann)
 
     def _walk_context(ctx):
         for ann in ctx.__annotations__.values():

@@ -18,9 +18,10 @@ import os
 import sys
 from contextlib import ExitStack
 from pathlib import Path
+from typing import List, Optional
 
 import typer
-from typing_extensions import Annotated, List, Optional
+from typing_extensions import Annotated
 
 from .util import fatal, get_node, setup_logging
 
@@ -44,7 +45,7 @@ def configure_runtime_args_env(runtime, args_env, values, pipes, logger):
             if type is not str:
                 try:
                     value = ast.literal_eval(value)
-                except Exception:
+                except (ValueError, SyntaxError):
                     pass
             logger.debug(f"  {name}: {value}")
             set_node(runtime.setdefault(args_env, {}), name, value)
@@ -159,7 +160,7 @@ def run(
     config_file: typer.FileText,
     dry_run: Annotated[bool, typer.Option()] = False,
     explain: Annotated[bool, typer.Option(help="Describe what the script does.")] = False,
-    log_level: Annotated[str, typer.Option(callback=setup_logging("INFO"))] = None,
+    log_level: Annotated[Optional[str], typer.Option(callback=setup_logging("INFO"))] = None,
     arguments: Annotated[Optional[List[str]], typer.Option("--argument", "-a", help="Pass an argument to the Pipes runtime.")] = None,
 ):
     """
