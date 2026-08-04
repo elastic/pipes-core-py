@@ -44,6 +44,7 @@ def run_import(format_, data, *, guess, stdio, streaming):
 
     filename = None
     old_stdin = None
+    in_file = None
     suffix = f".{format_}" if format_ else None
     try:
         config = {
@@ -58,7 +59,8 @@ def run_import(format_, data, *, guess, stdio, streaming):
 
         if stdio:
             old_stdin = sys.stdin
-            sys.stdin = open(filename, "r")
+            in_file = open(filename, "r")  # noqa: SIM115
+            sys.stdin = in_file
         else:
             config["file"] = filename
 
@@ -68,8 +70,8 @@ def run_import(format_, data, *, guess, stdio, streaming):
         with run("core.import", config, state, in_memory_state=streaming) as state:
             yield state["data"]
     finally:
-        if old_stdin:
-            sys.stdin.close()
+        if in_file:
+            in_file.close()
             sys.stdin = old_stdin
         if filename:
             os.unlink(filename)

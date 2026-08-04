@@ -96,7 +96,7 @@ def test_config():
     @Pipe("test_config_mutable_default")
     def _(
         pipe: Pipe,
-        name: Annotated[Any, Pipe.Config("name")] = {},
+        name: Annotated[Any, Pipe.Config("name")] = {},  # noqa: B006
     ):
         pass
 
@@ -216,7 +216,7 @@ def test_state():
     @Pipe("test_state_mutable_default")
     def _(
         pipe: Pipe,
-        name: Annotated[dict, Pipe.State("name")] = {},
+        name: Annotated[dict, Pipe.State("name")] = {},  # noqa: B006
     ):
         pass
 

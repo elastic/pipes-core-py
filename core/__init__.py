@@ -13,13 +13,13 @@
 # limitations under the License.
 
 """Core definitions for creating Elastic Pipes components."""
-
 import logging
 import sys
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from collections.abc import Mapping, Sequence
 from contextlib import ExitStack
+from typing import ClassVar
 
 from typing_extensions import Annotated, Any, NoDefault, get_args
 
@@ -79,7 +79,7 @@ def _get_name_from_func(func):
 
 
 class Pipe:
-    __pipes__ = {}
+    __pipes__: ClassVar[dict] = {}
 
     def __init__(self, name=None, *, default=sys.exit, notes=None, closing_notes=None):
         self.func = None
@@ -132,7 +132,7 @@ class Pipe:
         core_logger.debug(f"checking configuration '{self.name}'...")
 
         params = list(self._walk_config_params())
-        nodes = list(path for path, _ in walk_tree(config))
+        nodes = [path for path, _ in walk_tree(config)]
 
         unknown = set()
         for node_path in nodes:
@@ -230,7 +230,7 @@ class Pipe:
                         except KeyError as e:
                             raise Error(e.args[0])
 
-            setattr(sub, "__pipe_ctx_bindings__", bindings)
+            sub.__pipe_ctx_bindings__ = bindings
             return stack.enter_context(sub())
 
         @classmethod
@@ -284,12 +284,11 @@ class Pipe:
                 binding.root = config
                 binding.root_name = "config"
 
-            if indirect:
-                if binding.root is None and has_node(config, indirect):
-                    binding.node = get_node(config, indirect)
-                    binding.root = state
-                    binding.root_name = "state"
-                    core_logger.debug(f"  bind param '{param.name}' to state node '{binding.node}'")
+            if indirect and binding.root is None and has_node(config, indirect):
+                binding.node = get_node(config, indirect)
+                binding.root = state
+                binding.root_name = "state"
+                core_logger.debug(f"  bind param '{param.name}' to state node '{binding.node}'")
 
             if binding.root is None:
                 binding.root = config
@@ -374,10 +373,9 @@ class Pipe:
                 binding.root = config
                 binding.root_name = "config"
 
-            if indirect:
-                if binding.root is None:
-                    node = get_node(config, indirect, node)
-                    binding.node = node
+            if indirect and binding.root is None:
+                node = get_node(config, indirect, node)
+                binding.node = node
 
             if binding.root is None:
                 binding.root = state

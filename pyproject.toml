@@ -54,3 +54,11 @@ skip = ["test/venv"]
 [tool.ruff]
 line-length = 140
 exclude = ["test/venv"]
+
+[tool.ruff.lint.per-file-ignores]
+"core/import.py" = ["N999"]
+"core/standalone.py" = ["RUF013"]
+"core/runner.py" = ["FA100"]
+"core/__init__.py" = ["RUF013"]
+"test/test_pipe.py" = ["RUF013"]
+"test/*.py" = ["SIM117"]
