@@ -19,7 +19,7 @@ import re
 import sys
 from collections.abc import Mapping
 
-from typing_extensions import Any, NoDefault, get_args
+from typing_extensions import Any, NoDefault, get_args, get_type_hints
 
 from .errors import ConfigError, Error
 
@@ -296,11 +296,19 @@ def walk_contexts(pipe):
             yield from _walk_context(ann)
 
     def _walk_context(ctx):
-        for ann in ctx.__annotations__.values():
+        try:
+            hints = get_type_hints(ctx, include_extras=True)
+        except NameError as e:
+            raise Error(f"cannot resolve annotations for context '{ctx.__name__}': {e}") from e
+        for ann in hints.values():
             yield from _walk_ann(ann)
 
-    for param in signature(pipe.func).parameters.values():
-        yield from _walk_ann(param.annotation)
+    try:
+        hints = get_type_hints(pipe.func, include_extras=True)
+    except NameError as e:
+        raise Error(f"cannot resolve annotations for pipe '{pipe.name}': {e}") from e
+    for name, param in signature(pipe.func).parameters.items():
+        yield from _walk_ann(hints.get(name, param.annotation))
 
 
 def walk_params(pipe):
@@ -329,14 +337,22 @@ def walk_params(pipe):
             yield node, args[0], help, notes, default, empty
 
     def _walk_context(ctx):
-        for name, ann in ctx.__annotations__.items():
+        try:
+            hints = get_type_hints(ctx, include_extras=True)
+        except NameError as e:
+            raise Error(f"cannot resolve annotations for context '{ctx.__name__}': {e}") from e
+        for name, ann in hints.items():
             default = getattr(ctx, name, NoDefault)
             yield from _walk_ann(ann, default, NoDefault)
 
     yield from _walk_context(CommonContext)
 
-    for param in signature(pipe.func).parameters.values():
-        yield from _walk_ann(param.annotation, param.default, param.empty)
+    try:
+        hints = get_type_hints(pipe.func, include_extras=True)
+    except NameError as e:
+        raise Error(f"cannot resolve annotations for pipe '{pipe.name}': {e}") from e
+    for name, param in signature(pipe.func).parameters.items():
+        yield from _walk_ann(hints.get(name, param.annotation), param.default, param.empty)
 
 
 def walk_config_nodes(pipes, prefix):
