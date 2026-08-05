@@ -21,7 +21,7 @@ from collections.abc import Mapping, Sequence
 from contextlib import ExitStack
 from typing import ClassVar
 
-from typing_extensions import Annotated, Any, NoDefault, get_args
+from typing_extensions import Annotated, Any, NoDefault, get_args, get_type_hints
 
 from .errors import ConfigError, Error
 from .util import get_node, has_node, is_mutable, set_node
@@ -162,24 +162,29 @@ class Pipe:
         with ExitStack() as stack:
             cc = CommonContext.bind(stack, config, state, core_logger, self.logger)
 
+            try:
+                hints = get_type_hints(self.func, include_extras=True)
+            except NameError as e:
+                raise Error(f"cannot resolve annotations for pipe '{self.name}': {e}") from e
             kwargs = {}
             for name, param in signature(self.func).parameters.items():
                 if name == "dry_run":
                     kwargs["dry_run"] = dry_run
                     continue
-                if isinstance(param.annotation, type):
-                    if issubclass(param.annotation, Pipe):
+                ann = hints.get(name, param.annotation)
+                if isinstance(ann, type):
+                    if issubclass(ann, Pipe):
                         kwargs[name] = self
-                    elif issubclass(param.annotation, logging.Logger):
+                    elif issubclass(ann, logging.Logger):
                         kwargs[name] = self.logger
-                    elif issubclass(param.annotation, ExitStack):
+                    elif issubclass(ann, ExitStack):
                         kwargs[name] = exit_stack
-                    elif issubclass(param.annotation, Pipe.Context):
-                        kwargs[name] = param.annotation.bind(stack, config, state, core_logger, self.logger)
-                    elif issubclass(param.annotation, CommonContext):
+                    elif issubclass(ann, Pipe.Context):
+                        kwargs[name] = ann.bind(stack, config, state, core_logger, self.logger)
+                    elif issubclass(ann, CommonContext):
                         kwargs[name] = cc
                     continue
-                args = get_args(param.annotation)
+                args = get_args(ann)
                 for ann in args:
                     if isinstance(ann, Pipe.Node):
                         param = Pipe.Node.Param(name, args[0], param.default, param.empty)
@@ -211,7 +216,11 @@ class Pipe:
             # define a new sub-type of the user's context
             sub = type(cls.__name__, (cls,), {"logger": pipe_logger})
             bindings = {}
-            for name, ann in cls.__annotations__.items():
+            try:
+                hints = get_type_hints(cls, include_extras=True)
+            except NameError as e:
+                raise Error(f"cannot resolve annotations for context '{cls.__name__}': {e}") from e
+            for name, ann in hints.items():
                 if isinstance(ann, type):
                     if issubclass(ann, Pipe.Context):
                         nested = ann.bind(stack, config, state, core_logger, pipe_logger)

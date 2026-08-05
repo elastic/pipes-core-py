@@ -17,7 +17,7 @@ from collections.abc import Mapping
 from contextlib import ExitStack
 
 import pytest
-from typing_extensions import Annotated, Any, get_args
+from typing_extensions import Annotated, Any, get_args, get_type_hints
 
 from core import CommonContext, Pipe, get_pipes
 from core.errors import ConfigError, Error
@@ -273,7 +273,7 @@ def test_ctx():
     def _(ctx: TestContext, cc: CommonContext):
         assert ctx.name == "me"
         assert ctx.user == "you"
-        assert "some other annotation" in get_args(ctx.__annotations__["name"])
+        assert "some other annotation" in get_args(get_type_hints(type(ctx), include_extras=True)["name"])
 
     @Pipe("test_ctx_set")
     def _(ctx: TestContext):
