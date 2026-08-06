@@ -28,6 +28,9 @@ from .util import get_node, has_node, is_mutable, set_node
 
 __version__ = "0.8.0-dev"
 
+TRACE = 5
+logging.addLevelName(TRACE, "TRACE")
+
 
 def _indirect(node):
     return node + "@"
