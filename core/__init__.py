@@ -35,7 +35,7 @@ def _indirect(node):
 
 def validate_logging_config(name, config):
     if level := get_node(config, "logging.level", None):
-        level_nr = getattr(logging, level.upper(), None)
+        level_nr = logging.getLevelName(level.upper())
         if not isinstance(level_nr, int):
             raise ConfigError(f"invalid configuration: pipe '{name}': node 'logging.level': value '{level}'")
 
