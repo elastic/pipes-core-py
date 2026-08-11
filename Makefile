@@ -25,6 +25,9 @@ lint:
 	$(PYTHON) -m black -q --check . || ($(PYTHON) -m black .; false)
 	$(PYTHON) -m isort -q --check . || ($(PYTHON) -m isort .; false)
 
+ruleset-check:
+	$(PYTHON) scripts/check-ruleset-sync.py
+
 test: FORCE
 	$(PYTHON) -m pytest $(PYTEST_FLAGS_) test
 
