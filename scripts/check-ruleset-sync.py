@@ -71,6 +71,9 @@ def buildkite_checks_from_catalog(path: Path) -> set[str]:
 
     For every YAML document in *path* whose ``spec.type`` is
     ``"buildkite-pipeline"``, yields ``buildkite/<spec.implementation.metadata.name>``.
+    Pipelines with ``spec.implementation.spec.provider_settings.trigger_mode == "none"``
+    are excluded: they are not driven by BK's SCM integration and therefore do not
+    post commit statuses on PRs.
     Returns an empty set when the file does not exist.
     """
     if not path.exists():
@@ -83,6 +86,9 @@ def buildkite_checks_from_catalog(path: Path) -> set[str]:
                 continue
             spec = doc.get("spec") or {}
             if spec.get("type") != "buildkite-pipeline":
+                continue
+            impl_spec = (spec.get("implementation") or {}).get("spec") or {}
+            if (impl_spec.get("provider_settings") or {}).get("trigger_mode") == "none":
                 continue
             name = ((spec.get("implementation") or {}).get("metadata") or {}).get("name")
             if name:
