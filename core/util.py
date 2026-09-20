@@ -47,6 +47,7 @@ def get_es_client(stack):
 
     shell_expand = get_node(stack, "shell-expand", False)
     api_key = get_node(stack, "credentials.api-key", None, shell_expand=shell_expand)
+    token = get_node(stack, "credentials.token", None, shell_expand=shell_expand)
     username = get_node(stack, "credentials.username", None, shell_expand=shell_expand)
     password = get_node(stack, "credentials.password", None, shell_expand=shell_expand)
 
@@ -55,6 +56,8 @@ def get_es_client(stack):
     }
     if api_key:
         args["api_key"] = api_key
+    elif token:
+        args["bearer_auth"] = token
     elif username:
         args["basic_auth"] = (username, password)
     return Elasticsearch(**args)
@@ -65,6 +68,7 @@ def get_kb_client(stack):
 
     shell_expand = get_node(stack, "shell-expand", False)
     api_key = get_node(stack, "credentials.api-key", None, shell_expand=shell_expand)
+    token = get_node(stack, "credentials.token", None, shell_expand=shell_expand)
     username = get_node(stack, "credentials.username", None, shell_expand=shell_expand)
     password = get_node(stack, "credentials.password", None, shell_expand=shell_expand)
 
@@ -73,6 +77,8 @@ def get_kb_client(stack):
     }
     if api_key:
         args["api_key"] = api_key
+    elif token:
+        args["bearer_auth"] = token
     elif username:
         args["basic_auth"] = (username, password)
     return Kibana(**args)
