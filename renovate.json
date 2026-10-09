@@ -10,6 +10,7 @@
         "actions/download-artifact",
         "actions/setup-python",
         "actions/upload-artifact",
+        "docker.elastic.co/ci-agent-images/pipelib",
         "hashicorp/vault",
         "pypa/gh-action-pypi-publish"
       ],
