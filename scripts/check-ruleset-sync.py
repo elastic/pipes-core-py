@@ -26,8 +26,9 @@ of checks expected for this repository:
 
   * Buildkite pipeline checks derived from catalog-info.yaml: every document
     with spec.type == "buildkite-pipeline" contributes a check context of the
-    form "buildkite/<spec.implementation.metadata.name>" (skipped when
-    catalog-info.yaml does not exist).
+    form "buildkite/<spec.implementation.metadata.name>" unless the pipeline
+    is manual-only (implementation.spec.provider_settings.trigger_mode: none).
+    This source is skipped when catalog-info.yaml does not exist.
 
 Required environment variables:
   GITHUB_TOKEN       - token with repository access; metadata read (always
@@ -71,7 +72,9 @@ def buildkite_checks_from_catalog(path: Path) -> set[str]:
 
     For every YAML document in *path* whose ``spec.type`` is
     ``"buildkite-pipeline"``, yields ``buildkite/<spec.implementation.metadata.name>``.
-    Returns an empty set when the file does not exist.
+    Pipelines whose ``implementation.spec.provider_settings.trigger_mode`` is
+    ``"none"`` are treated as manual-only and skipped. Returns an empty set
+    when the file does not exist.
     """
     if not path.exists():
         return set()
@@ -84,7 +87,12 @@ def buildkite_checks_from_catalog(path: Path) -> set[str]:
             spec = doc.get("spec") or {}
             if spec.get("type") != "buildkite-pipeline":
                 continue
-            name = ((spec.get("implementation") or {}).get("metadata") or {}).get("name")
+            implementation = spec.get("implementation") or {}
+            provider_settings = (implementation.get("spec") or {}).get("provider_settings") or {}
+            trigger_mode = str(provider_settings.get("trigger_mode", "")).strip().lower()
+            if trigger_mode == "none":
+                continue
+            name = (implementation.get("metadata") or {}).get("name")
             if name:
                 checks.add(f"buildkite/{name}")
     return checks
