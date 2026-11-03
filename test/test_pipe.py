@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import re
+import sys
 from collections.abc import Mapping
 from contextlib import ExitStack
+from typing import Optional, Sequence
 
 import pytest
 from typing_extensions import Annotated, Any, get_args, get_type_hints
@@ -235,6 +237,43 @@ def test_state():
     msg = re.escape("param 'name': mutable default not allowed: {}")
     with pytest.raises(TypeError, match=msg):
         run("test_state_mutable_default", {}, {})
+
+
+def test_parameterized_bindings():
+    @Pipe("test_parameterized_bindings")
+    def _(
+        rules: Annotated[Sequence[Mapping], Pipe.State("rules", mutable=True)],
+        rule_ids: Annotated[Optional[Sequence[str]], Pipe.Config("rule-ids")] = None,  # noqa: FA100
+    ):
+        assert rules == [{"id": "rule-1"}]
+        assert rule_ids == ["rule-1"]
+
+    run("test_parameterized_bindings", {"rule-ids": ["rule-1"]}, {"rules": [{"id": "rule-1"}]})
+
+    msg = re.escape("param 'rule_ids': config node 'rule-ids' type mismatch: 'int' (expected 'Sequence or NoneType')")
+    with pytest.raises(Error, match=msg):
+        run("test_parameterized_bindings", {"rule-ids": 1}, {"rules": [{"id": "rule-1"}]})
+
+    msg = re.escape("param 'rules': state node 'rules' type mismatch: 'int' (expected 'Sequence')")
+    with pytest.raises(Error, match=msg):
+        run("test_parameterized_bindings", {"rule-ids": ["rule-1"]}, {"rules": 1})
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="PEP 604 unions require Python 3.10+")
+def test_pep_604_union_bindings():
+    @Pipe("test_pep_604_union_bindings")
+    def _(
+        config_value: Annotated[str | None, Pipe.Config("config-value")],  # noqa: FA102
+        state_values: Annotated[list[str] | None, Pipe.State("state-values", mutable=True)],  # noqa: FA102
+    ):
+        assert config_value == "configured"
+        assert state_values == ["from-state"]
+
+    run(
+        "test_pep_604_union_bindings",
+        {"config-value": "configured"},
+        {"state-values": ["from-state"]},
+    )
 
 
 def test_ctx():

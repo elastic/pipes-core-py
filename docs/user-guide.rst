@@ -79,6 +79,26 @@ Bind parameters to state nodes:
    generated property setter. Plain pipe function parameters have no such
    write-back mechanism — mutable containers can only be changed in place.
 
+Parameterized Types
+^^^^^^^^^^^^^^^^^^^
+
+Bindings validate the outer runtime type of parameterized annotations. This
+allows generic types to describe a binding without passing a parameterized
+annotation directly to ``isinstance``:
+
+.. code-block:: python
+
+   from typing import Mapping, Optional, Sequence
+
+   rules: Annotated[Sequence[Mapping], Pipe.State("rules", mutable=True)]
+   rule_ids: Annotated[Optional[Sequence[str]], Pipe.Config("rule-ids")] = None
+
+In this example, ``rules`` accepts a sequence and ``rule_ids`` accepts either
+``None`` or a sequence. On Python 3.10 and later, the equivalent PEP 604
+syntax (``Sequence[str] | None``) is also supported. Bindings do not validate
+the types of individual collection members; validate them in the pipe when
+required.
+
 Indirect References
 ^^^^^^^^^^^^^^^^^^^
 
