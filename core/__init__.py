@@ -48,13 +48,15 @@ See :class:`Pipe` for decorator details, :class:`Pipe.Config` and
 :class:`Pipe.State` for parameter binding, and :class:`Pipe.Context`
 for context managers.
 """
+
 import logging
 import sys
+import types
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from collections.abc import Mapping, Sequence
 from contextlib import ExitStack
-from typing import ClassVar
+from typing import ClassVar, Union, get_origin
 
 from typing_extensions import Annotated, Any, NoDefault, get_args, get_type_hints
 
@@ -72,6 +74,30 @@ __version__ = "0.9.0-dev"
 
 TRACE = 5
 logging.addLevelName(TRACE, "TRACE")
+
+# PEP 604 unions are unavailable on Python 3.8, which this package supports.
+_PEP_604_UNION_TYPE = getattr(types, "UnionType", object())
+
+
+def _runtime_type(type_):
+    """Return an annotation's runtime-checkable type.
+
+    Parameterized generic annotations cannot be passed directly to
+    :func:`isinstance`. Their origin is the runtime type to validate. A
+    A ``typing.Union`` or PEP 604 union is represented by a tuple of its
+    runtime-checkable member types.
+    """
+    origin = get_origin(type_)
+    if origin is Union or origin is _PEP_604_UNION_TYPE:
+        return tuple(_runtime_type(arg) for arg in get_args(type_))
+    return origin or type_
+
+
+def _runtime_type_name(type_):
+    """Return a readable name for a runtime-checkable type."""
+    if isinstance(type_, tuple):
+        return " or ".join(_runtime_type_name(member) for member in type_)
+    return type_.__name__
 
 
 def _indirect(node):
@@ -648,10 +674,11 @@ class Pipe:
                                 raise KeyError(f"param '{param.name}': state node not found: '{v}'")
                         else:
                             value[k] = v
-                if value is None or param.type is Any or isinstance(value, param.type):
+                expected_type = _runtime_type(param.type)
+                if value is None or param.type is Any or isinstance(value, expected_type):
                     return value
                 value_type = type(value).__name__
-                expected_type = param.type.__name__
+                expected_type = _runtime_type_name(expected_type)
                 raise Error(
                     f"param '{param.name}': {binding.root_name} node '{binding.node}' type mismatch: '{value_type}' (expected '{expected_type}')"
                 )
@@ -780,10 +807,11 @@ class Pipe:
                             value[k] = v
                 if value is not None and is_mutable(value) and not self.mutable:
                     raise AttributeError(f"param '{param.name}' is mutable but not marked as such")
-                if value is None or param.type is Any or isinstance(value, param.type):
+                expected_type = _runtime_type(param.type)
+                if value is None or param.type is Any or isinstance(value, expected_type):
                     return value
                 value_type = type(value).__name__
-                expected_type = param.type.__name__
+                expected_type = _runtime_type_name(expected_type)
                 raise Error(
                     f"param '{param.name}': {binding.root_name} node '{binding.node}' type mismatch: '{value_type}' (expected '{expected_type}')"
                 )
