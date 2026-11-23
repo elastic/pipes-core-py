@@ -8,7 +8,17 @@
       "matchPackageNames": [
         "python"
       ],
-      "matchCurrentValue": "^3\\.8$",
+      "matchCurrentValue": "/^3\\.8$/",
+      "enabled": false
+    },
+    {
+      "matchPackageNames": [
+        "ubuntu"
+      ],
+      "matchDepTypes": [
+        "github-runner"
+      ],
+      "matchCurrentValue": "/^24\\.04$/",
       "enabled": false
     },
     {
